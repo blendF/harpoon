@@ -1,0 +1,8 @@
+# Harpoon - Automated Pentesting Tool
+# Python 3.10+
+
+# Packaging
+pyinstaller>=6.0.0
+
+# Optional: for richer CLI (no hard dependency)
+# rich>=13.0.0

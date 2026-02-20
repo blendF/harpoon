@@ -1,0 +1,32 @@
+# External tool sources (too large for repo)
+metasploit-framework-master/
+nuclei-dev/
+
+# Build artifacts
+dist/
+build/
+*.exe
+*.spec.bak
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Logs (generated at runtime)
+harpoon_logs/
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Bundled tools (user must provide)
+tools/gobuster.exe
