@@ -2,10 +2,11 @@
 metasploit-framework-master/
 nuclei-dev/
 
-# Build artifacts
+# Build artifacts & installers
 dist/
 build/
 *.exe
+*.msi
 *.spec.bak
 
 # Python

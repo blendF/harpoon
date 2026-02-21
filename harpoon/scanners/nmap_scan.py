@@ -34,8 +34,7 @@ def run_nmap(
 
     # Strip URL scheme if present for Nmap
     host = target.replace("http://", "").replace("https://", "").split("/")[0].split(":")[0]
-    # -sV: service version; -sC: default scripts; -O: OS detection
-    argv = [cmd, "-sV", "-sC", "-O", host]
+    argv = [cmd, "-sV", "-sC", "-O", "-v", "--reason", host]
     code, out, err = run_capture(argv, log_path, timeout=timeout)
     msg = "Nmap scan complete." if code == 0 else f"Nmap finished with code {code}."
     return code, out, msg

@@ -3,6 +3,14 @@ import re
 from pathlib import Path
 
 from harpoon.config import BASE_DIR, GOBUSTER_CMD, GOBUSTER_LOG, LOG_DIR
+from harpoon.runner import find_cmd, run_capture
+
+# Bundled tools path (when Gobuster is in Harpoon/tools/)
+GOBUSTER_BUNDLED = BASE_DIR / "tools" / "gobuster.exe"
+
+# Bundled wordlist shipped with Harpoon (harpoon/wordlist.txt)
+HARPOON_WORDLIST = Path(__file__).resolve().parent.parent / "wordlist.txt"
+COMMON_WORDLIST_LINUX = "/usr/share/wordlists/dirb/common.txt"
 
 
 def _append_note(log_path: Path, note: str) -> None:
@@ -12,32 +20,24 @@ def _append_note(log_path: Path, note: str) -> None:
         log_path.write_text(existing.rstrip() + "\n\n" + note, encoding="utf-8", errors="replace")
     except OSError:
         pass
-from harpoon.runner import find_cmd, run_capture
-
-# Bundled tools path (when Gobuster is in Harpoon/tools/)
-GOBUSTER_BUNDLED = BASE_DIR / "tools" / "gobuster.exe"
-
-# Default wordlist paths (optional)
-COMMON_WORDLIST_LINUX = "/usr/share/wordlists/dirb/common.txt"
 
 
 def _get_wordlist_path(wordlist: str | None) -> str:
-    """Return path to wordlist; create expanded one in LOG_DIR if needed."""
+    """Return path to wordlist: explicit arg -> bundled harpoon/wordlist.txt -> Linux default -> tiny fallback."""
     if wordlist and Path(wordlist).exists():
         return wordlist
+    if HARPOON_WORDLIST.exists():
+        return str(HARPOON_WORDLIST)
     if Path(COMMON_WORDLIST_LINUX).exists():
         return COMMON_WORDLIST_LINUX
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    wl_path = LOG_DIR / "gobuster_wordlist.txt"
-    # Expanded wordlist - ensure file exists and has content
+    wl_path = LOG_DIR / "gobuster_wordlist_fallback.txt"
     words = [
-        "admin", "login", "api", "static", "assets", "backup", "tmp", "test", "config", "wp", "cgi",
+        "admin", "login", "api", "static", "assets", "backup", "tmp", "test", "config",
         "dashboard", "user", "users", "auth", "signin", "signup", "register", "account",
-        "v1", "v2", "docs", "swagger", "health", "status", "debug", "_dev",
-        "administrator", "manager", "private", "internal", "secret",
+        "v1", "v2", "docs", "swagger", "health", "status", "debug",
         "upload", "uploads", "files", "media", "images", "css", "js", "fonts",
-        "admin.php", "index.php", "login.php", "api.php", "config.php", "install",
-        ".git", ".env", "env", "robots.txt", "sitemap.xml", "crossdomain.xml",
+        ".git", ".env", "robots.txt", "sitemap.xml",
     ]
     wl_path.write_text("\n".join(words), encoding="utf-8")
     return str(wl_path)
@@ -68,8 +68,8 @@ def run_gobuster(
 
     wl = _get_wordlist_path(wordlist)
     base_argv = [
-        cmd, "dir", "-u", target_url, "-w", wl, "-q", "-t", "15",
-        "-k", "--follow-redirect",
+        cmd, "dir", "-u", target_url, "-w", wl, "-t", "15",
+        "-k", "--follow-redirect", "-e",
         "--status-codes-blacklist", "404",
     ]
 

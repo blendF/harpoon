@@ -16,6 +16,7 @@ from harpoon.config import (
     GOBUSTER_LOG,
     NMAP_LOG,
     NUCLEI_LOG,
+    RECON_LOG,
     REPORT_PATH,
     SQLMAP_LOG,
     ZAP_LOG,
@@ -28,6 +29,7 @@ from harpoon.scanners.nmap_scan import run_nmap
 from harpoon.scanners.nuclei_scan import run_nuclei
 from harpoon.parsers.nmap_parser import parse_nmap_report_file
 from harpoon.exploit.metasploit_runner import run_metasploit_for_services
+from harpoon.recon import dns_lookup, save_recon_log
 from harpoon.report import generate_report
 
 
@@ -44,12 +46,27 @@ def main() -> None:
 
     web_url = url_for_web_scan(target_raw)
 
+    # Pre-scan: DNS Recon & CDN/WAF Detection
+    print(f"DNS Recon on target: {target_host}")
+    recon_info = dns_lookup(target_host)
+    save_recon_log(recon_info, RECON_LOG)
+    if recon_info.ips:
+        print(f"  Resolved IP(s): {', '.join(recon_info.ips)}")
+    else:
+        print("  Could not resolve hostname.")
+    if recon_info.is_cdn:
+        print(f"  WARNING: Target appears to be behind {recon_info.cdn_name}.")
+        print("  Scans may be rate-limited or blocked by WAF. Adjusting scan parameters.")
+    else:
+        print("  Direct host (no CDN/WAF detected)")
+    print()
+
     # Phase 1: Reconnaissance
     def do_recon():
         return run_nmap(target_url, log_path=NMAP_LOG)
 
-    print(f"Reconnaissance on target: {target_host}")
-    print("  [Nmap – Network Mapper] (Est. 5–15 min)")
+    print(f"Phase 1 – Reconnaissance on target: {target_host}")
+    print("  [Nmap – Network Mapper]  Est. 3–10 min")
     code, _out, msg = run_with_spinner("  ", do_recon)
     print("  done." if code == 0 else f"  {msg}")
 
@@ -57,42 +74,44 @@ def main() -> None:
     def do_enum():
         return run_gobuster(target_url_https)
 
-    print(f"Enumeration on target: {target_host}")
-    print("  [Gobuster – Dir/File enumeration]")
+    print(f"\nPhase 2 – Enumeration on target: {target_host}")
+    print("  [Gobuster – Dir/File brute-force]  Est. 2–5 min (1,800 words)")
     code, msg = run_with_spinner("  ", do_enum)
     print(f"  {msg}")
 
     # Phase 3: Web Application Scanning
-    print(f"Web application scanning on target: {target_host}")
+    print(f"\nPhase 3 – Web Application Scanning on target: {target_host}")
 
-    print("  [OWASP ZAP – Zed Attack Proxy]")
+    print("  [OWASP ZAP – Zed Attack Proxy]  Est. 5–15 min")
     def do_zap():
         return run_zap(web_url)
     code, _ = run_with_spinner("  ", do_zap)
     print("  done." if code == 0 else "  Scan encountered issues.")
 
-    print("  [Sqlmap – SQL injection testing]")
+    print("  [Sqlmap – SQL injection testing]  Est. 2–5 min")
     def do_sqlmap():
         return run_sqlmap(target_url_https, gobuster_log=GOBUSTER_LOG)
     code, _ = run_with_spinner("  ", do_sqlmap)
     print("  done." if code == 0 else "  Scan encountered issues.")
 
-    print("  [Nuclei – Template-based vuln scanner]")
+    cdn_note = " (CDN rate-limited)" if recon_info.is_cdn else ""
+    print(f"  [Nuclei – Template-based vuln scanner]  Est. 5–10 min{cdn_note}")
     def do_nuclei():
         return run_nuclei(
             base_url=web_url,
             host=target_host,
             nmap_log=NMAP_LOG,
             gobuster_log=GOBUSTER_LOG,
+            is_cdn=recon_info.is_cdn,
         )
-    code, _ = run_with_spinner("  ", do_nuclei)
-    print("  done." if code == 0 else "  Scan encountered issues.")
+    code, nuclei_msg = run_with_spinner("  ", do_nuclei)
+    print(f"  {nuclei_msg}")
 
     # Phase 4: Exploitation
     services = parse_nmap_report_file(str(NMAP_LOG))
     if services:
-        print(f"Exploitation on target: {target_host}")
-        print("  [Metasploit Framework – MSF]")
+        print(f"\nPhase 4 – Exploitation on target: {target_host}")
+        print(f"  [Metasploit Framework – MSF]  Est. 1–3 min per service ({len(services)} services)")
 
         def do_msf():
             return run_metasploit_for_services(
@@ -105,7 +124,7 @@ def main() -> None:
         if exploit_success:
             print("  Stopping after possible compromise.")
     else:
-        print("Exploitation: skipped (no exploitable services identified).")
+        print("\nPhase 4 – Exploitation: skipped (no exploitable services identified).")
 
     # Report: generate immediately, then enhance with Ollama
     run_with_spinner("Generating report… ", lambda: generate_report(target_raw, report_path=REPORT_PATH, use_ollama=False))
@@ -115,7 +134,8 @@ def main() -> None:
     from harpoon.ollama_client import ollama_available
     from harpoon.config import OLLAMA_MODEL
     if ollama_available():
-        print(f"Enhancing report with AI summary ({OLLAMA_MODEL})… ", end="", flush=True)
+        print(f"Enhancing report with AI-assisted analysis ({OLLAMA_MODEL})…  Est. 1–3 min")
+        print("  Generating technical analysis with real-world impact assessment…", end=" ", flush=True)
         try:
             generate_report(target_raw, report_path=REPORT_PATH, use_ollama=True)
             print("done.")

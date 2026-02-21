@@ -46,11 +46,13 @@ def run_sqlmap(
         argv = [
             cmd, "-m", str(urls_file), "--batch",
             "--forms", "--crawl=2", "--level=3", "--risk=2",
+            "-v", "3",
         ]
     else:
         argv = [
             cmd, "-u", target_url, "--batch",
             "--forms", "--crawl=3", "--level=3", "--risk=2",
+            "-v", "3",
         ]
 
     code, out, err = run_capture(argv, log_path, timeout=timeout)

@@ -26,6 +26,7 @@ NMAP_LOG = LOG_DIR / "nmap_scan.txt"
 NUCLEI_LOG = LOG_DIR / "nuclei_scan.txt"
 NUCLEI_TARGETS_FILE = LOG_DIR / "nuclei_targets.txt"
 MSF_LOG = LOG_DIR / "metasploit_exploits.txt"
+RECON_LOG = LOG_DIR / "dns_recon.txt"
 REPORT_PATH = OUTPUT_DIR / "Harpoon_Report.md"
 
 # Local tool directories (sibling to Harpoon when run from project root)
