@@ -26,6 +26,10 @@ NMAP_LOG = LOG_DIR / "nmap_scan.txt"
 NUCLEI_LOG = LOG_DIR / "nuclei_scan.txt"
 NUCLEI_TARGETS_FILE = LOG_DIR / "nuclei_targets.txt"
 MSF_LOG = LOG_DIR / "metasploit_exploits.txt"
+NIKTO_LOG = LOG_DIR / "nikto_scan.txt"
+FFUF_DIR_LOG = LOG_DIR / "ffuf_dir.json"
+FFUF_VHOST_LOG = LOG_DIR / "ffuf_vhost.json"
+FFUF_PARAMS_LOG = LOG_DIR / "ffuf_params.json"
 RECON_LOG = LOG_DIR / "dns_recon.txt"
 REPORT_PATH = OUTPUT_DIR / "Harpoon_Report.md"
 
@@ -35,6 +39,10 @@ MSF_LOCAL = BASE_DIR / "metasploit-framework-master" / "metasploit-framework-mas
 MSF_LOCAL_CWD = OUTPUT_DIR / "metasploit-framework-master" / "metasploit-framework-master"
 NUCLEI_LOCAL = BASE_DIR / "nuclei-dev" / "nuclei-dev"
 NUCLEI_LOCAL_CWD = OUTPUT_DIR / "nuclei-dev" / "nuclei-dev"
+WORDLISTS_DIR = BASE_DIR / "harpoon" / "wordlists"
+WORDLISTS_DIR_CWD = OUTPUT_DIR / "harpoon" / "wordlists"
+NIKTO_LOCAL = BASE_DIR / "nikto" / "program"
+NIKTO_LOCAL_CWD = OUTPUT_DIR / "nikto" / "program"
 
 # Tool names (can be overridden via env or config)
 ZAP_CMD = os.environ.get("HARPOON_ZAP", "zap.sh")  # or zap.bat on Windows
@@ -43,5 +51,7 @@ GOBUSTER_CMD = os.environ.get("HARPOON_GOBUSTER", "gobuster")
 NMAP_CMD = os.environ.get("HARPOON_NMAP", "nmap")
 NUCLEI_CMD = os.environ.get("HARPOON_NUCLEI", "nuclei")
 MSFCONSOLE_CMD = os.environ.get("HARPOON_MSFCONSOLE", "msfconsole")
+NIKTO_CMD = os.environ.get("HARPOON_NIKTO", "nikto")
+FFUF_CMD = os.environ.get("HARPOON_FFUF", "ffuf")
 OLLAMA_CMD = os.environ.get("HARPOON_OLLAMA", "ollama")
 OLLAMA_MODEL = os.environ.get("HARPOON_OLLAMA_MODEL", "qwen3.5:cloud")

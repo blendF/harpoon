@@ -1,1 +1,1 @@
-# Scanners: ZAP, Sqlmap, Gobuster, Nmap
+# Scanners: ZAP, Sqlmap, Gobuster, Nmap, Nikto, ffuf

@@ -1,5 +1,5 @@
 """
-Build Nuclei scan context from Nmap, Gobuster, and target URL.
+Build Nuclei scan context from Nmap, Gobuster, ffuf, and target URL.
 Provides target URLs and template tags so Nuclei knows where and what to attack.
 """
 import re
@@ -116,9 +116,12 @@ def build_nuclei_targets(
     gobuster_log_path: Path,
     host: str,
     targets_file: Path,
+    ffuf_dir_log: Path | None = None,
+    ffuf_vhost_log: Path | None = None,
 ) -> tuple[list[str], list[str]]:
     """
     Build Nuclei target list and template tags from recon data.
+    Merges paths from Gobuster and ffuf, plus vhosts from ffuf.
     Returns (list of target URLs, list of template tags).
     """
     base_url = base_url.rstrip("/")
@@ -131,6 +134,28 @@ def build_nuclei_targets(
         paths = parse_gobuster_paths(gob_text)
         for p in paths:
             targets.add(f"{base_url}{p}" if p.startswith("/") else f"{base_url}/{p}")
+
+    # Add paths discovered by ffuf dir fuzzing
+    if ffuf_dir_log and ffuf_dir_log.exists():
+        try:
+            from harpoon.scanners.ffuf_scan import get_ffuf_discovered_paths
+            for p in get_ffuf_discovered_paths(ffuf_dir_log):
+                targets.add(f"{base_url}{p}" if p.startswith("/") else f"{base_url}/{p}")
+        except (ImportError, OSError):
+            pass
+
+    # Add virtual hosts discovered by ffuf as additional base targets
+    if ffuf_vhost_log and ffuf_vhost_log.exists():
+        try:
+            from harpoon.scanners.ffuf_scan import get_ffuf_discovered_vhosts
+            from urllib.parse import urlparse
+            parsed = urlparse(base_url)
+            scheme = parsed.scheme or "https"
+            for vhost in get_ffuf_discovered_vhosts(ffuf_vhost_log):
+                fqdn = f"{vhost}.{host}" if "." not in vhost else vhost
+                targets.add(f"{scheme}://{fqdn}")
+        except (ImportError, OSError):
+            pass
 
     # Add HTTP URLs from Nmap (prioritize non-standard ports to avoid duplicate scans)
     services = parse_nmap_report_file(str(nmap_log_path))

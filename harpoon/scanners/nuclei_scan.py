@@ -3,6 +3,8 @@ import subprocess
 from pathlib import Path
 
 from harpoon.config import (
+    FFUF_DIR_LOG,
+    FFUF_VHOST_LOG,
     GOBUSTER_LOG,
     NMAP_LOG,
     NUCLEI_CMD,
@@ -46,11 +48,13 @@ def run_nuclei(
     targets_file: Path = NUCLEI_TARGETS_FILE,
     timeout: int = 600,
     is_cdn: bool = False,
+    ffuf_dir_log: Path = FFUF_DIR_LOG,
+    ffuf_vhost_log: Path = FFUF_VHOST_LOG,
 ) -> tuple[int, str]:
     """
-    Run Nuclei with context from Nmap and Gobuster.
-    Builds target list (base URL + discovered paths + HTTP ports) and template tags
-    from detected services, so Nuclei knows where and what to attack.
+    Run Nuclei with context from Nmap, Gobuster, and ffuf.
+    Builds target list (base URL + discovered paths/vhosts + HTTP ports)
+    and template tags from detected services.
     When is_cdn=True, rate-limits requests to avoid WAF blocks.
     """
     cmd = _find_nuclei()
@@ -70,6 +74,8 @@ def run_nuclei(
         gobuster_log_path=gobuster_log,
         host=host,
         targets_file=targets_file,
+        ffuf_dir_log=ffuf_dir_log,
+        ffuf_vhost_log=ffuf_vhost_log,
     )
 
     argv = [

@@ -17,7 +17,7 @@ $$ |  $$ |\$$$$$$$ |$$ |      $$$$$$$  |\$$$$$$  |\$$$$$$  |$$ |  $$ |
 **Author:** Blendi "blendFpwn" Ferizi  
 **License:** MIT
 
-Harpoon is a Windows CLI tool that automates the full penetration testing lifecycle against web applications. Give it a target URL and it runs reconnaissance, enumeration, vulnerability scanning, and exploitation — then generates a detailed report with real-world impact analysis, powered by an AI model (Ollama + qwen3.5:cloud).
+Harpoon is a Windows CLI tool that automates the full penetration testing lifecycle against web applications. Give it a target URL and it runs reconnaissance, enumeration, vulnerability scanning (including web server analysis with Nikto), and exploitation — then generates a detailed report with real-world impact analysis, powered by an AI model (Ollama + qwen3.5:cloud).
 
 ---
 
@@ -33,8 +33,10 @@ Harpoon is a Windows CLI tool that automates the full penetration testing lifecy
    - [OWASP ZAP](#4-owasp-zap)
    - [Sqlmap](#5-sqlmap)
    - [Nuclei](#6-nuclei)
-   - [Metasploit Framework](#7-metasploit-framework)
-   - [Ollama (AI Reports)](#8-ollama--ai-report-generation)
+   - [Nikto](#7-nikto)
+   - [ffuf](#8-ffuf)
+   - [Metasploit Framework](#9-metasploit-framework)
+   - [Ollama (AI Reports)](#10-ollama--ai-report-generation)
 5. [Running Harpoon](#running-harpoon)
 6. [What Each Phase Does](#what-each-phase-does)
 7. [Output Files](#output-files)
@@ -47,7 +49,7 @@ Harpoon is a Windows CLI tool that automates the full penetration testing lifecy
 
 ## How It Works
 
-Harpoon orchestrates six security tools in a structured pipeline where each phase feeds context into the next:
+Harpoon orchestrates eight security tools in a structured pipeline where each phase feeds context into the next:
 
 ```
 Target URL
@@ -59,11 +61,11 @@ DNS Recon ──────── Resolve IPs, detect CDN/WAF (Cloudflare, Akam
 Phase 1: Nmap ──── Port scan, service detection, OS fingerprint
     │
     ▼
-Phase 2: Gobuster ─ Directory/file brute-force (1,800-word wordlist)
+Phase 2: Gobuster + ffuf ─ Dir brute-force + vhost/subdomain discovery
     │
-    ├──▶ Discovered paths feed into Sqlmap and Nuclei
+    ├──▶ Discovered paths + vhosts feed into Sqlmap, Nuclei, ffuf params
     ▼
-Phase 3: ZAP + Sqlmap + Nuclei ─── Web vuln scanning + SQLi testing + CVE matching
+Phase 3: ZAP + Sqlmap + Nikto + ffuf params + Nuclei ─── Web vuln scanning + SQLi + param fuzzing + CVE matching
     │
     ├──▶ Nmap services + Nuclei CVEs feed into Metasploit
     ▼
@@ -85,6 +87,8 @@ Report Generation ──── Structured Markdown report + AI-assisted analysis
 | OWASP ZAP          | 2.x+     | Recommended | Web vulnerability scanning     |
 | Sqlmap             | 1.7+     | Recommended | SQL injection testing           |
 | Nuclei             | 3.x+     | Recommended | Template-based CVE scanning     |
+| Nikto              | 2.x+     | Recommended | Web server misconfiguration scanner |
+| ffuf               | 2.x+     | Recommended | Fast directory, vhost, and parameter fuzzing |
 | Metasploit Framework | 6.x+  | Recommended | Automated exploitation          |
 | Ollama             | Latest   | Optional  | AI-powered report analysis        |
 
@@ -245,7 +249,59 @@ Verify:
 nuclei -version
 ```
 
-### 7. Metasploit Framework
+### 7. Nikto
+
+Nikto scans for web server misconfigurations, outdated software, dangerous default files, and known vulnerabilities in Phase 3.
+
+**Option A — Install via Git (recommended):**
+```powershell
+git clone https://github.com/sullo/nikto.git
+```
+Add the `nikto/program` folder to your system PATH, or set `HARPOON_NIKTO` to point to `nikto.pl`.
+
+> **Note:** Nikto is a Perl script. On Windows you need Perl installed (e.g. [Strawberry Perl](https://strawberryperl.com/)). On Linux/macOS, Perl is typically pre-installed.
+
+**Option B — Kali Linux:**
+Nikto comes pre-installed on Kali.
+
+**Option C — Package manager (Linux):**
+```bash
+sudo apt install nikto
+```
+
+Verify:
+```powershell
+nikto -Version
+```
+
+### 8. ffuf
+
+ffuf (Fuzz Faster U Fool) handles fast directory fuzzing, virtual host / subdomain discovery, and parameter fuzzing in Phases 2 and 3.
+
+**Option A — Pre-built binary (recommended):**
+
+Download the latest release from [github.com/ffuf/ffuf/releases](https://github.com/ffuf/ffuf/releases).
+Extract `ffuf` (or `ffuf.exe` on Windows) and add to PATH.
+
+**Option B — Install via Go:**
+```powershell
+# Requires Go: winget install GoLang.Go
+go install github.com/ffuf/ffuf/v2@latest
+```
+
+**Option C — Package manager (Linux):**
+```bash
+sudo apt install ffuf
+```
+
+Harpoon ships with bundled wordlists for subdomain discovery (522 entries) and parameter fuzzing (356 entries) at `harpoon/wordlists/`. Directory fuzzing reuses the existing 1,828-word wordlist.
+
+Verify:
+```powershell
+ffuf -V
+```
+
+### 9. Metasploit Framework
 
 Metasploit handles Phase 4 (Exploitation). It attempts automated exploits based on discovered services and CVEs from Nuclei.
 
@@ -291,7 +347,7 @@ msfconsole --version
 msfconsole.bat --version
 ```
 
-### 8. Ollama — AI Report Generation
+### 10. Ollama — AI Report Generation
 
 Ollama is used to generate the AI-assisted analysis section of the report using the `qwen3.5:cloud` model. This is optional but highly recommended for actionable, human-readable reports.
 
@@ -362,6 +418,12 @@ Phase 2 – Enumeration on target: target.com
   [Gobuster – Dir/File brute-force]  Est. 2–5 min (1,800 words)
   ⠋ ...
   Enumeration complete.
+  [ffuf – Fast dir/file fuzzing]  Est. 1–2 min
+  ⠋ ...
+  ffuf dir: 15 path(s) discovered.
+  [ffuf – Virtual host / subdomain discovery]  Est. 1–2 min
+  ⠋ ...
+  ffuf vhost: 3 subdomain(s) discovered.
 
 Phase 3 – Web Application Scanning on target: target.com
   [OWASP ZAP – Zed Attack Proxy]  Est. 5–15 min
@@ -370,6 +432,12 @@ Phase 3 – Web Application Scanning on target: target.com
   [Sqlmap – SQL injection testing]  Est. 2–5 min
   ⠋ ...
   done.
+  [Nikto – Web server scanner]  Est. 2–5 min
+  ⠋ ...
+  Nikto scan complete.
+  [ffuf – Parameter fuzzing (GET+POST)]  Est. 2–5 min
+  ⠋ ...
+  ffuf params: 4 parameter(s) discovered across 5 page(s).
   [Nuclei – Template-based vuln scanner]  Est. 5–10 min (CDN rate-limited)
   ⠋ ...
   Scan complete (12 targets, tags: cve,apache,nginx).
@@ -393,8 +461,11 @@ Enhancing report with AI-assisted analysis (qwen3.5:cloud)…  Est. 1–3 min
 | Pre-scan | DNS Recon | < 5 seconds |
 | Phase 1 | Nmap | 3–10 minutes |
 | Phase 2 | Gobuster | 2–5 minutes |
+| Phase 2 | ffuf (dir + vhost) | 2–4 minutes |
 | Phase 3 | OWASP ZAP | 5–15 minutes |
 | Phase 3 | Sqlmap | 2–5 minutes |
+| Phase 3 | Nikto | 2–5 minutes |
+| Phase 3 | ffuf (params) | 2–5 minutes |
 | Phase 3 | Nuclei | 5–10 minutes |
 | Phase 4 | Metasploit | 1–3 min per service |
 | Report | Ollama AI | 1–3 minutes |
@@ -417,16 +488,18 @@ Enhancing report with AI-assisted analysis (qwen3.5:cloud)…  Est. 1–3 min
 - OS fingerprinting (`-O`)
 - Verbose output with connection reasons (`-v --reason`)
 
-### Phase 2: Enumeration (Gobuster)
-- Directory and file brute-force against the target using the bundled 1,828-word wordlist
-- Handles wildcard/SPA responses automatically (retries with `--exclude-length`)
-- Handles HTTP 503 targets gracefully
-- Discovered paths feed into Sqlmap (for additional injection testing) and Nuclei (for targeted scanning)
+### Phase 2: Enumeration (Gobuster + ffuf)
+- **Gobuster** — Directory and file brute-force against the target using the bundled 1,828-word wordlist. Handles wildcard/SPA responses automatically
+- **ffuf dir** — Fast parallel directory/file fuzzing (50 threads) as a complementary pass using the same wordlist
+- **ffuf vhost** — Virtual host / subdomain discovery by fuzzing the `Host:` header with a bundled 522-entry subdomain wordlist. Uses auto-calibration (`-ac`) to filter false positives
+- Discovered paths and subdomains feed into Sqlmap, Nuclei, and ffuf param fuzzing
 
 ### Phase 3: Web Application Scanning
 - **OWASP ZAP** — Automated spider + active scan for XSS, CSRF, injection, misconfigurations
 - **Sqlmap** — SQL injection testing against the target URL and all Gobuster-discovered paths, with `--level=3 --risk=2` and verbose output (`-v 3`)
-- **Nuclei** — Template-based scanning using tags derived from Nmap service detection (e.g., if Apache is detected, Nuclei runs Apache-specific CVE templates). Targets include the base URL plus all Gobuster-discovered paths
+- **Nikto** — Web server scanner that checks for outdated software, dangerous default files/CGIs, server misconfigurations, and known vulnerabilities (OSVDB/CVE). Runs comprehensive checks (`-C all`) in non-interactive mode
+- **ffuf params** — GET and POST parameter fuzzing against the base URL and top discovered paths, using a bundled 356-entry parameter wordlist. Discovered parameters expand the attack surface for injection testing
+- **Nuclei** — Template-based scanning using tags derived from Nmap service detection. Targets include the base URL plus all Gobuster-discovered paths, ffuf-discovered paths, and ffuf-discovered vhosts
 
 ### Phase 4: Exploitation (Metasploit)
 - For each open service found by Nmap, generates a Metasploit resource script (.rc) that searches for and runs relevant exploits
@@ -456,6 +529,10 @@ harpoon/
     ├── sqlmap_scan.txt            ← SQL injection test details & payloads
     ├── nuclei_scan.txt            ← CVE/misconfiguration matches
     ├── nuclei_targets.txt         ← Target URLs fed to Nuclei
+    ├── nikto_scan.txt             ← Nikto web server scan findings
+    ├── ffuf_dir.json              ← ffuf directory/file fuzzing results
+    ├── ffuf_vhost.json            ← ffuf virtual host/subdomain discovery
+    ├── ffuf_params.json           ← ffuf parameter fuzzing results
     ├── metasploit_exploits.txt    ← MSF exploit attempts & session status
     ├── msf_*.rc                   ← Generated Metasploit resource scripts
     └── msf_out_*.txt              ← Per-exploit Metasploit output
@@ -476,6 +553,8 @@ If a tool is installed in a non-standard location, override its path:
 | `HARPOON_ZAP` | `zap.sh` | `C:\Program Files\ZAP\zap.bat` |
 | `HARPOON_SQLMAP` | `sqlmap` | `C:\Python\Scripts\sqlmap` |
 | `HARPOON_NUCLEI` | `nuclei` | `C:\Go\bin\nuclei.exe` |
+| `HARPOON_NIKTO` | `nikto` | `C:\nikto\program\nikto.pl` |
+| `HARPOON_FFUF` | `ffuf` | `C:\Go\bin\ffuf.exe` |
 | `HARPOON_MSFCONSOLE` | `msfconsole` | `C:\metasploit-framework\bin\msfconsole.bat` |
 | `HARPOON_OLLAMA` | `ollama` | `C:\Users\you\AppData\Local\Programs\Ollama\ollama.exe` |
 | `HARPOON_OLLAMA_MODEL` | `qwen3.5:cloud` | `llama3:8b` |
@@ -526,6 +605,17 @@ To include `gobuster.exe` in the bundle, place it at `tools/gobuster.exe` before
 - Install via Go: `go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest`
 - Or download from [releases](https://github.com/projectdiscovery/nuclei/releases) and add to PATH
 - Harpoon also checks `nuclei-dev/nuclei-dev/bin/nuclei.exe` in the project root
+
+### "Nikto not found"
+- Clone the repo: `git clone https://github.com/sullo/nikto.git` and add `nikto/program` to PATH
+- On Windows, Nikto requires Perl — install [Strawberry Perl](https://strawberryperl.com/)
+- Override: `$env:HARPOON_NIKTO = "C:\path\to\nikto.pl"`
+
+### "ffuf not found"
+- Install via Go: `go install github.com/ffuf/ffuf/v2@latest`
+- Or download from [releases](https://github.com/ffuf/ffuf/releases) and add to PATH
+- Harpoon also checks WSL if ffuf is installed there
+- Override: `$env:HARPOON_FFUF = "C:\path\to\ffuf.exe"`
 
 ### "OWASP ZAP not found"
 - Install via winget: `winget install OWASP.ZAP`
@@ -579,7 +669,7 @@ harpoon/
 │   ├── recon.py                   ← DNS lookup & CDN/WAF detection
 │   ├── report.py                  ← Report generation (parsing + Markdown)
 │   ├── ollama_client.py           ← Ollama LLM integration
-│   ├── nuclei_context.py          ← Nuclei target/tag builder from Nmap+Gobuster
+│   ├── nuclei_context.py          ← Nuclei target/tag builder from Nmap+Gobuster+ffuf
 │   ├── wordlist.txt               ← Bundled 1,828-word directory wordlist
 │   │
 │   ├── scanners/                  ← Tool wrappers
@@ -587,7 +677,14 @@ harpoon/
 │   │   ├── gobuster_scan.py
 │   │   ├── nuclei_scan.py
 │   │   ├── zap_scan.py
-│   │   └── sqlmap_scan.py
+│   │   ├── sqlmap_scan.py
+│   │   ├── nikto_scan.py
+│   │   └── ffuf_scan.py
+│   │
+│   │
+│   ├── wordlists/                 ← Bundled fuzzing wordlists
+│   │   ├── subdomains.txt         ← 522-entry subdomain wordlist
+│   │   └── params.txt             ← 356-entry parameter wordlist
 │   │
 │   ├── parsers/                   ← Output parsers
 │   │   └── nmap_parser.py

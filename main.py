@@ -13,9 +13,13 @@ from harpoon.target import normalize_target, normalize_target_https, prompt_lhos
 from harpoon.logs import ensure_log_dir
 from harpoon.spinner import run_with_spinner
 from harpoon.config import (
+    FFUF_DIR_LOG,
+    FFUF_PARAMS_LOG,
+    FFUF_VHOST_LOG,
     GOBUSTER_LOG,
     NMAP_LOG,
     NUCLEI_LOG,
+    NIKTO_LOG,
     RECON_LOG,
     REPORT_PATH,
     SQLMAP_LOG,
@@ -27,6 +31,8 @@ from harpoon.scanners.sqlmap_scan import run_sqlmap
 from harpoon.scanners.gobuster_scan import run_gobuster
 from harpoon.scanners.nmap_scan import run_nmap
 from harpoon.scanners.nuclei_scan import run_nuclei
+from harpoon.scanners.nikto_scan import run_nikto
+from harpoon.scanners.ffuf_scan import run_ffuf_dir, run_ffuf_vhost, run_ffuf_params
 from harpoon.parsers.nmap_parser import parse_nmap_report_file
 from harpoon.exploit.metasploit_runner import run_metasploit_for_services
 from harpoon.recon import dns_lookup, save_recon_log
@@ -79,6 +85,19 @@ def main() -> None:
     code, msg = run_with_spinner("  ", do_enum)
     print(f"  {msg}")
 
+    cdn_flag = recon_info.is_cdn
+    print("  [ffuf – Fast dir/file fuzzing]  Est. 1–2 min")
+    def do_ffuf_dir():
+        return run_ffuf_dir(target_url_https, is_cdn=cdn_flag)
+    code, ffuf_dir_msg = run_with_spinner("  ", do_ffuf_dir)
+    print(f"  {ffuf_dir_msg}")
+
+    print("  [ffuf – Virtual host / subdomain discovery]  Est. 1–2 min")
+    def do_ffuf_vhost():
+        return run_ffuf_vhost(web_url, domain=target_host, is_cdn=cdn_flag)
+    code, ffuf_vhost_msg = run_with_spinner("  ", do_ffuf_vhost)
+    print(f"  {ffuf_vhost_msg}")
+
     # Phase 3: Web Application Scanning
     print(f"\nPhase 3 – Web Application Scanning on target: {target_host}")
 
@@ -94,6 +113,23 @@ def main() -> None:
     code, _ = run_with_spinner("  ", do_sqlmap)
     print("  done." if code == 0 else "  Scan encountered issues.")
 
+    print("  [Nikto – Web server scanner]  Est. 2–5 min")
+    def do_nikto():
+        return run_nikto(web_url)
+    code, nikto_msg = run_with_spinner("  ", do_nikto)
+    print(f"  {nikto_msg}")
+
+    print("  [ffuf – Parameter fuzzing (GET+POST)]  Est. 2–5 min")
+    def do_ffuf_params():
+        return run_ffuf_params(
+            target_url_https,
+            gobuster_log=GOBUSTER_LOG,
+            ffuf_dir_log=FFUF_DIR_LOG,
+            is_cdn=cdn_flag,
+        )
+    code, ffuf_params_msg = run_with_spinner("  ", do_ffuf_params)
+    print(f"  {ffuf_params_msg}")
+
     cdn_note = " (CDN rate-limited)" if recon_info.is_cdn else ""
     print(f"  [Nuclei – Template-based vuln scanner]  Est. 5–10 min{cdn_note}")
     def do_nuclei():
@@ -103,6 +139,8 @@ def main() -> None:
             nmap_log=NMAP_LOG,
             gobuster_log=GOBUSTER_LOG,
             is_cdn=recon_info.is_cdn,
+            ffuf_dir_log=FFUF_DIR_LOG,
+            ffuf_vhost_log=FFUF_VHOST_LOG,
         )
     code, nuclei_msg = run_with_spinner("  ", do_nuclei)
     print(f"  {nuclei_msg}")

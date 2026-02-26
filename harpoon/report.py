@@ -1,11 +1,12 @@
 """Generate Harpoon_Report.md – human-readable, stage-based, actionable findings."""
+import json
 import re
 import html
 from datetime import datetime
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from harpoon.config import GOBUSTER_LOG, NMAP_LOG, NUCLEI_LOG, RECON_LOG, REPORT_PATH, MSF_LOG, SQLMAP_LOG, ZAP_LOG
+from harpoon.config import FFUF_DIR_LOG, FFUF_PARAMS_LOG, FFUF_VHOST_LOG, GOBUSTER_LOG, NMAP_LOG, NIKTO_LOG, NUCLEI_LOG, RECON_LOG, REPORT_PATH, MSF_LOG, SQLMAP_LOG, ZAP_LOG
 from harpoon.ollama_client import ollama_summarize_findings
 
 
@@ -154,6 +155,98 @@ def _parse_exploitation_result(text: str) -> tuple[str, str]:
     return "safe", "No successful exploitation; services appear patched or properly configured."
 
 
+def _parse_nikto_result(text: str) -> tuple[str, list[str]]:
+    """Return (status, list_of_findings) from Nikto output."""
+    t = (text or "").lower()
+    if "nikto not found" in t or ("not found" in t and "install" in t and "path" in t):
+        return "skipped", []
+    findings: list[str] = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("=== stdout", "=== stderr", "# Nikto", "# Target:", "# Command:")):
+            continue
+        if stripped.startswith("+") and len(stripped) > 2:
+            content = stripped[1:].strip()
+            if content.startswith("-"):
+                content = content[1:].strip()
+            if not content:
+                continue
+            skip_prefixes = ("Target IP:", "Target Hostname:", "Target Port:",
+                             "Start Time:", "End Time:", "host(s) tested",
+                             "Scan terminated:", "0 host")
+            if any(content.startswith(s) for s in skip_prefixes):
+                continue
+            if "host(s) tested" in content:
+                continue
+            findings.append(content[:200])
+    if findings:
+        return "findings", findings[:25]
+    return "safe", []
+
+
+def _parse_ffuf_json(path: Path) -> list[dict]:
+    """Load ffuf JSON results from log file."""
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        return data.get("results", [])
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _parse_ffuf_dir_result(log_path: Path) -> tuple[str, list[str]]:
+    """Return (status, list_of_paths) from ffuf dir JSON."""
+    results = _parse_ffuf_json(log_path)
+    if not results:
+        if log_path.exists():
+            try:
+                data = json.loads(log_path.read_text(encoding="utf-8", errors="replace"))
+                if "error" in data and "not found" in data["error"].lower():
+                    return "skipped", []
+            except (json.JSONDecodeError, OSError):
+                pass
+        return "safe", []
+    paths = []
+    for r in results[:30]:
+        url = r.get("url", "")
+        status = r.get("status", 0)
+        length = r.get("length", 0)
+        if url:
+            paths.append(f"{url} (Status: {status}, Size: {length})")
+    return "findings", paths
+
+
+def _parse_ffuf_vhost_result(log_path: Path) -> tuple[str, list[str]]:
+    """Return (status, list_of_vhosts) from ffuf vhost JSON."""
+    results = _parse_ffuf_json(log_path)
+    if not results:
+        return "safe", []
+    vhosts = []
+    for r in results[:20]:
+        host = r.get("input", {}).get("FUZZ", "") or r.get("host", "")
+        status = r.get("status", 0)
+        if host:
+            vhosts.append(f"{host} (Status: {status})")
+    return "findings", vhosts
+
+
+def _parse_ffuf_params_result(log_path: Path) -> tuple[str, list[str]]:
+    """Return (status, list_of_param_descriptions) from ffuf params JSON."""
+    results = _parse_ffuf_json(log_path)
+    if not results:
+        return "safe", []
+    params = []
+    for r in results[:30]:
+        param = r.get("input", {}).get("FUZZ", "")
+        mode = r.get("_mode", "GET")
+        target = r.get("_target", "")
+        status = r.get("status", 0)
+        if param:
+            params.append(f"{mode} `{param}` on {target} (Status: {status})")
+    return "findings", params
+
+
 def _risk_to_status(risk: str) -> str:
     r = (risk or "").lower()
     if "critical" in r or "high" in r:
@@ -208,6 +301,14 @@ def _build_sections(
     gobuster_detail: str,
     exploit_status: str,
     exploit_detail: str,
+    nikto_status: str = "safe",
+    nikto_findings: list[str] | None = None,
+    ffuf_dir_status: str = "safe",
+    ffuf_dir_findings: list[str] | None = None,
+    ffuf_vhost_status: str = "safe",
+    ffuf_vhost_findings: list[str] | None = None,
+    ffuf_params_status: str = "safe",
+    ffuf_params_findings: list[str] | None = None,
     recon_ips: list[str] | None = None,
     recon_cdn_name: str = "",
     recon_is_cdn: bool = False,
@@ -293,6 +394,46 @@ def _build_sections(
         sections.append("*Action:* Review every discovered path. Remove or restrict access to admin panels, "
                         "backup files, and development endpoints. Ensure .git, .env, and config files are not web-accessible.")
     sections.append("")
+
+    if ffuf_dir_status == "skipped":
+        sections.append("### ffuf Directory Fuzzing – Not Run")
+        sections.append("")
+        sections.append("*ffuf was not found. Install from https://github.com/ffuf/ffuf and add to PATH, or set HARPOON_FFUF.*")
+        sections.append("")
+    elif ffuf_dir_findings:
+        sections.append("### Fast Directory/File Fuzzing (ffuf)")
+        sections.append("")
+        sections.append(f"ffuf discovered {len(ffuf_dir_findings)} additional path(s):")
+        sections.append("")
+        for f in (ffuf_dir_findings or []):
+            sections.append(f"- {f}")
+        sections.append("")
+    elif ffuf_dir_status == "safe":
+        sections.append("### Fast Directory/File Fuzzing (ffuf)")
+        sections.append("")
+        sections.append("*No additional paths discovered beyond Gobuster results.*")
+        sections.append("")
+
+    if ffuf_vhost_findings:
+        sections.append("### Virtual Host / Subdomain Discovery (ffuf)")
+        sections.append("")
+        sections.append(f"ffuf discovered {len(ffuf_vhost_findings)} virtual host(s) / subdomain(s):")
+        sections.append("")
+        for f in (ffuf_vhost_findings or []):
+            sections.append(f"- {f}")
+        sections.append("")
+        sections.append("**Real-world impact:** Hidden subdomains may host staging/dev environments, "
+                        "admin panels, internal APIs, or legacy applications with weaker security controls.")
+        sections.append("")
+        sections.append("*Action:* Investigate each discovered subdomain. Ensure dev/staging environments "
+                        "are not publicly accessible and apply the same security controls as production.")
+        sections.append("")
+    elif ffuf_vhost_status == "safe":
+        sections.append("### Virtual Host / Subdomain Discovery (ffuf)")
+        sections.append("")
+        sections.append("*No additional virtual hosts or subdomains discovered.*")
+        sections.append("")
+
     sections.append("---")
     sections.append("")
     sections.append("## Phase 2: Web Application Scanning")
@@ -357,6 +498,48 @@ def _build_sections(
             sections.append("")
     elif not zap_failure:
         sections.append("*No web vulnerabilities identified or scan data unavailable.*")
+        sections.append("")
+
+    if nikto_status == "skipped":
+        sections.append("### Nikto – Not Run")
+        sections.append("")
+        sections.append("*Nikto was not found on PATH. Install from https://github.com/sullo/nikto and add to PATH, or set HARPOON_NIKTO.*")
+        sections.append("")
+    elif nikto_findings:
+        sections.append("### Web Server Findings (Nikto)")
+        sections.append("")
+        sections.append("Nikto identified the following web server issues:")
+        sections.append("")
+        for f in (nikto_findings or []):
+            sections.append(f"- {f}")
+        sections.append("")
+        sections.append("*Action:* Review each finding. Update server software, remove default files, "
+                        "and disable unnecessary HTTP methods. Restrict server version disclosure in response headers.")
+        sections.append("")
+    elif nikto_status == "safe":
+        sections.append("### Web Server Scanning (Nikto)")
+        sections.append("")
+        sections.append("*No notable web server misconfigurations or outdated components identified.*")
+        sections.append("")
+
+    if ffuf_params_findings:
+        sections.append("### Parameter Discovery (ffuf)")
+        sections.append("")
+        sections.append(f"ffuf discovered {len(ffuf_params_findings)} hidden parameter(s):")
+        sections.append("")
+        for f in (ffuf_params_findings or []):
+            sections.append(f"- {f}")
+        sections.append("")
+        sections.append("**Real-world impact:** Hidden parameters may accept unvalidated input, "
+                        "enabling injection attacks (SQLi, XSS, SSRF, LFI) or exposing debug/admin functionality.")
+        sections.append("")
+        sections.append("*Action:* Test each discovered parameter for injection vulnerabilities. "
+                        "Apply input validation, parameterized queries, and output encoding.")
+        sections.append("")
+    elif ffuf_params_status == "safe":
+        sections.append("### Parameter Discovery (ffuf)")
+        sections.append("")
+        sections.append("*No hidden parameters discovered on tested pages.*")
         sections.append("")
 
     if nuclei_not_found:
@@ -453,6 +636,8 @@ def _build_sections(
     sections.append("| OWASP ZAP | ZAP (Zed Attack Proxy) | Web app vulnerability scanning |")
     sections.append("| Sqlmap | SQLi | SQL injection testing |")
     sections.append("| Nuclei | CVE/templates | Template-based vulnerability scanning |")
+    sections.append("| ffuf | Fuzz Faster U Fool | Directory, vhost, and parameter fuzzing |")
+    sections.append("| Nikto | Web scanner | Web server misconfiguration and vulnerability scanner |")
     sections.append("| Metasploit Framework | MSF | Exploitation framework |")
     sections.append("")
     sections.append("---")
@@ -461,6 +646,7 @@ def _build_sections(
     sections.append("")
     high_count = len([a for a in zap_alerts if "high" in (a.get("risk", "")).lower() or "critical" in (a.get("risk", "")).lower()])
     nuclei_crit = len([f for f in nuclei_findings if "critical" in f.lower() or "high" in f.lower()])
+    nikto_count = len(nikto_findings or [])
     if exploit_status == "at_risk" or sqlmap_status == "at_risk":
         sections.append("### CRITICAL")
         sections.append("")
@@ -473,6 +659,11 @@ def _build_sections(
         sections.append(f"Found {high_count + nuclei_crit} high/critical severity finding(s) across web scanning "
                         "and template-based detection. These vulnerabilities are known to be exploitable "
                         "and should be patched before an attacker discovers them.")
+    elif nikto_count > 5:
+        sections.append("### HIGH")
+        sections.append("")
+        sections.append(f"Nikto identified {nikto_count} web server issue(s) including potential misconfigurations, "
+                        "outdated software, or dangerous defaults. Review and remediate each finding.")
     elif nmap_ports:
         sections.append("### MEDIUM")
         sections.append("")
@@ -497,6 +688,10 @@ def _build_sections(
     sections.append("| `zap_report.txt` | OWASP ZAP spider + active scan alerts (XML) |")
     sections.append("| `sqlmap_scan.txt` | SQL injection test payloads, responses, and detection details |")
     sections.append("| `nuclei_scan.txt` | CVE/misconfiguration template matches with severity |")
+    sections.append("| `nikto_scan.txt` | Nikto web server scan findings |")
+    sections.append("| `ffuf_dir.json` | ffuf directory/file fuzzing results |")
+    sections.append("| `ffuf_vhost.json` | ffuf virtual host/subdomain discovery |")
+    sections.append("| `ffuf_params.json` | ffuf parameter fuzzing results |")
     sections.append("| `msf_exploit.txt` | Metasploit module execution, session attempts, exploit output |")
     sections.append("| `dns_recon.txt` | DNS resolution, reverse DNS, CDN/WAF detection |")
     sections.append("")
@@ -525,6 +720,7 @@ def generate_report(
     sqlmap_text = read_excerpt(SQLMAP_LOG, 100_000) if SQLMAP_LOG.exists() else ""
     gobuster_text = read_excerpt(GOBUSTER_LOG, 50_000) if GOBUSTER_LOG.exists() else ""
     msf_text = read_excerpt(MSF_LOG, 50_000) if MSF_LOG.exists() else ""
+    nikto_text = read_excerpt(NIKTO_LOG, 100_000) if NIKTO_LOG.exists() else ""
 
     recon_ips, recon_cdn_name, recon_is_cdn = _parse_recon_result(recon_text)
     zap_alerts = _parse_zap_alerts(zap_text)
@@ -534,10 +730,14 @@ def generate_report(
     sqlmap_status, sqlmap_detail = _parse_sqlmap_result(sqlmap_text)
     gobuster_status, gobuster_detail = _parse_gobuster_result(gobuster_text)
     exploit_status, exploit_detail = _parse_exploitation_result(msf_text)
+    nikto_status, nikto_findings = _parse_nikto_result(nikto_text)
+    ffuf_dir_status, ffuf_dir_findings = _parse_ffuf_dir_result(FFUF_DIR_LOG)
+    ffuf_vhost_status, ffuf_vhost_findings = _parse_ffuf_vhost_result(FFUF_VHOST_LOG)
+    ffuf_params_status, ffuf_params_findings = _parse_ffuf_params_result(FFUF_PARAMS_LOG)
 
     ollama_summary = ""
     if use_ollama:
-        log_paths = {"ZAP": ZAP_LOG, "Nuclei": NUCLEI_LOG, "Sqlmap": SQLMAP_LOG, "Gobuster": GOBUSTER_LOG, "Nmap": NMAP_LOG, "Metasploit": MSF_LOG}
+        log_paths = {"ZAP": ZAP_LOG, "Nuclei": NUCLEI_LOG, "Sqlmap": SQLMAP_LOG, "Gobuster": GOBUSTER_LOG, "Nmap": NMAP_LOG, "Nikto": NIKTO_LOG, "ffuf-dir": FFUF_DIR_LOG, "ffuf-vhost": FFUF_VHOST_LOG, "ffuf-params": FFUF_PARAMS_LOG, "Metasploit": MSF_LOG}
         ollama_summary = ollama_summarize_findings(log_paths)
 
     sections = _build_sections(
@@ -546,6 +746,14 @@ def generate_report(
         sqlmap_status, sqlmap_detail,
         gobuster_status, gobuster_detail,
         exploit_status, exploit_detail,
+        nikto_status=nikto_status,
+        nikto_findings=nikto_findings,
+        ffuf_dir_status=ffuf_dir_status,
+        ffuf_dir_findings=ffuf_dir_findings,
+        ffuf_vhost_status=ffuf_vhost_status,
+        ffuf_vhost_findings=ffuf_vhost_findings,
+        ffuf_params_status=ffuf_params_status,
+        ffuf_params_findings=ffuf_params_findings,
         recon_ips=recon_ips,
         recon_cdn_name=recon_cdn_name,
         recon_is_cdn=recon_is_cdn,

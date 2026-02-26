@@ -31,3 +31,4 @@ Desktop.ini
 
 # Bundled tools (user must provide)
 tools/gobuster.exe
+nikto/
