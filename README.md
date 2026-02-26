@@ -17,7 +17,7 @@ $$ |  $$ |\$$$$$$$ |$$ |      $$$$$$$  |\$$$$$$  |\$$$$$$  |$$ |  $$ |
 **Author:** Blendi "blendFpwn" Ferizi  
 **License:** MIT
 
-Harpoon is a Windows CLI tool that automates the full penetration testing lifecycle against web applications. Give it a target URL and it runs reconnaissance, enumeration, vulnerability scanning (including web server analysis with Nikto), and exploitation — then generates a detailed report with real-world impact analysis, powered by an AI model (Ollama + qwen3.5:cloud).
+Harpoon is a fire-and-forget web application penetration testing tool built to automate the entire testing process from start to finish. You provide a target, and it handles discovery, analysis, exploitation, and generates a clear, real-world impact report — reducing manual effort while maintaining professional-grade depth. Designed for security professionals who want faster workflows, consistent methodology, and actionable results.
 
 ---
 
