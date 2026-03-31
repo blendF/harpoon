@@ -2,10 +2,9 @@
   <img src="assets/harpoon-banner.png" alt="Harpoon Banner" width="900">
 </p>
 
-# Harpoon — Fire and Forget Web-App Penetration Testing
-
 **Author:** Blendi "blendFpwn" Ferizi  
 **License:** MIT
+**Version:** 0.9.1
 
 Harpoon is a fire-and-forget web application penetration testing tool built to automate the entire testing process from start to finish. You provide a target, and it handles discovery, analysis, exploitation, and generates a clear, real-world impact report — reducing manual effort while maintaining professional-grade depth. Designed for security professionals who want faster workflows, consistent methodology, and actionable results.
 
