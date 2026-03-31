@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="theharpooner.jpg" alt="Harpoon Logo" width="200">
+  <img src="assets/harpoon-banner.png" alt="Harpoon Banner" width="900">
 </p>
 
 # Harpoon — Fire and Forget Web-App Penetration Testing
