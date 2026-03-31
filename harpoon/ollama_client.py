@@ -66,7 +66,7 @@ def query_ollama(prompt: str, model: str = OLLAMA_MODEL, timeout: int = OLLAMA_T
 
 
 def ollama_summarize_findings(log_paths: dict[str, Path]) -> str:
-    """Ask Ollama to produce a detailed, technical penetration test analysis."""
+    """Ask Ollama to produce a detailed, PoC-focused pentest analysis."""
     if not ollama_available():
         return ""
     excerpts: list[str] = []
@@ -80,25 +80,16 @@ def ollama_summarize_findings(log_paths: dict[str, Path]) -> str:
     if not excerpts:
         return ""
     prompt = (
-        "You are a senior penetration tester writing the AI-assisted analysis section "
-        "of a penetration test report. The audience is both security engineers and "
-        "management who need to understand business risk.\n\n"
-        "Below are raw outputs from automated security tools run against a target. "
-        "Analyze them and write a detailed report section following this structure:\n\n"
-        "1. **Critical Findings** – List each vulnerability found. For each one:\n"
-        "   - Technical description (CVE ID if available, affected component, attack vector)\n"
-        "   - Real-world impact if exploited (e.g., 'An attacker could exfiltrate the "
-        "entire user database', 'Remote code execution allows full server takeover')\n"
-        "   - Severity rating (Critical / High / Medium)\n"
-        "   - Recommended remediation steps\n\n"
-        "2. **Attack Surface Summary** – What ports, services, and paths are exposed. "
-        "Which ones are unnecessary and should be hardened.\n\n"
-        "3. **Positive Findings** – What defenses are working (e.g., no SQL injection found, "
-        "CDN/WAF in place, no default credentials detected).\n\n"
-        "4. **Priority Actions** – A numbered list of the top 5 most urgent actions, "
-        "ordered by severity and exploitability.\n\n"
-        "Be technical and specific. Reference actual ports, paths, CVEs, and service "
-        "versions from the scan data. Do not be vague.\n\n"
+        "You are a senior application security architect writing the AI-assisted analysis "
+        "section of a stateful black-box pentest report.\n\n"
+        "Inputs contain multi-phase recon/fuzz/validation outputs plus deterministic PoC data. "
+        "Write a concise technical analysis with this structure:\n"
+        "1) Critical findings and validated exploitability\n"
+        "2) WAF/defense behavior and how scan policy adapted\n"
+        "3) Actionable remediation prioritized by business impact\n"
+        "4) Manual testing recommendations for business-logic abuse (Phase 10 handoff)\n\n"
+        "Use concrete evidence from logs: CVE IDs, vulnerable paths, parameters, services, "
+        "and PoC request snippets. Avoid generic statements.\n\n"
         + "\n\n".join(excerpts)
     )
     return query_ollama(prompt, timeout=OLLAMA_TIMEOUT) or ""

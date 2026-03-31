@@ -13,8 +13,9 @@ from harpoon.config import (
     NUCLEI_LOCAL_CWD,
     NUCLEI_TARGETS_FILE,
 )
-from harpoon.nuclei_context import build_nuclei_targets
+from harpoon.nuclei_context import build_nuclei_targets, build_nuclei_targets_from_state
 from harpoon.runner import find_cmd, run_capture
+from harpoon.state import PipelineStateManager
 
 
 def _find_nuclei() -> str | None:
@@ -50,6 +51,9 @@ def run_nuclei(
     is_cdn: bool = False,
     ffuf_dir_log: Path = FFUF_DIR_LOG,
     ffuf_vhost_log: Path = FFUF_VHOST_LOG,
+    state_manager: PipelineStateManager | None = None,
+    waf_present: bool = False,
+    tech_tags: list[str] | None = None,
 ) -> tuple[int, str]:
     """
     Run Nuclei with context from Nmap, Gobuster, and ffuf.
@@ -68,15 +72,25 @@ def run_nuclei(
 
     _ensure_templates(cmd)
 
-    targets, tags = build_nuclei_targets(
-        base_url=base_url,
-        nmap_log_path=nmap_log,
-        gobuster_log_path=gobuster_log,
-        host=host,
-        targets_file=targets_file,
-        ffuf_dir_log=ffuf_dir_log,
-        ffuf_vhost_log=ffuf_vhost_log,
-    )
+    if state_manager:
+        targets, tags = build_nuclei_targets_from_state(
+            state=state_manager,
+            base_url=base_url,
+            host=host,
+            targets_file=targets_file,
+        )
+    else:
+        targets, tags = build_nuclei_targets(
+            base_url=base_url,
+            nmap_log_path=nmap_log,
+            gobuster_log_path=gobuster_log,
+            host=host,
+            targets_file=targets_file,
+            ffuf_dir_log=ffuf_dir_log,
+            ffuf_vhost_log=ffuf_vhost_log,
+        )
+    if tech_tags:
+        tags = sorted(set(tags) | {t.lower() for t in tech_tags if t})
 
     argv = [
         cmd,
@@ -84,10 +98,11 @@ def run_nuclei(
         "-severity", "critical,high,medium",
         "-no-interactsh",
         "-stats",
-        "-timeout", "30" if is_cdn else "15",
+        "-jsonl",
+        "-timeout", "30" if (is_cdn or waf_present) else "15",
     ]
-    if is_cdn:
-        argv.extend(["-rl", "50"])
+    if is_cdn or waf_present:
+        argv.extend(["-rl", "50", "-c", "10"])
     if tags:
         argv.extend(["-tags", ",".join(tags[:15])])
 

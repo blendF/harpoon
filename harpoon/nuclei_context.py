@@ -4,8 +4,10 @@ Provides target URLs and template tags so Nuclei knows where and what to attack.
 """
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 from harpoon.parsers.nmap_parser import ServiceInfo, parse_nmap_report_file
+from harpoon.state import PipelineStateManager
 
 # Map Nmap service/product names to Nuclei template tags (lowercase)
 # See: nuclei -tl (list tags) or https://github.com/projectdiscovery/nuclei-templates
@@ -172,3 +174,58 @@ def build_nuclei_targets(
     targets_file.write_text("\n".join(sorted(targets)), encoding="utf-8", errors="replace")
 
     return list(sorted(targets)), sorted(all_tags)
+
+
+def build_nuclei_targets_from_state(
+    state: PipelineStateManager,
+    base_url: str,
+    host: str,
+    targets_file: Path,
+) -> tuple[list[str], list[str]]:
+    """
+    Build Nuclei targets directly from centralized pipeline state.
+
+    This replaces log-file stitching with state-driven orchestration.
+    """
+    base = base_url.rstrip("/")
+    targets: set[str] = {base}
+    tags: set[str] = {"cve", "generic", "exposure"}
+
+    # URLs discovered by httpx/katana/wayback etc.
+    for row in state.get("urls", []):
+        u = row.get("url")
+        if u:
+            targets.add(u)
+
+    # Paths discovered by ffuf/gobuster.
+    for row in state.get("paths", []):
+        p = row.get("path")
+        if p:
+            targets.add(f"{base}{p}" if str(p).startswith("/") else f"{base}/{p}")
+
+    # Vhosts become additional base targets.
+    parsed = urlparse(base)
+    scheme = parsed.scheme or "https"
+    for row in state.get("vhosts", []):
+        v = row.get("value") or row.get("host") or ""
+        if v:
+            fqdn = v if "." in v else f"{v}.{host}"
+            targets.add(f"{scheme}://{fqdn}")
+
+    # Service-derived tags.
+    for p in state.get("ports", []):
+        combined = f"{p.get('service', '')} {p.get('product', '')} {p.get('version', '')}".lower()
+        for key, tag_list in SERVICE_TO_TAGS.items():
+            if key in combined:
+                tags.update(tag_list)
+
+    # Technology-derived tags.
+    for host_tech in state.get("technologies", {}).values():
+        for entry in host_tech:
+            tech = str(entry.get("tech", "")).lower()
+            if tech:
+                tags.add(tech)
+
+    targets_file.parent.mkdir(parents=True, exist_ok=True)
+    targets_file.write_text("\n".join(sorted(targets)), encoding="utf-8", errors="replace")
+    return sorted(targets), sorted(tags)

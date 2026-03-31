@@ -10,7 +10,12 @@ ZAP_DIR = Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "ZAP" / "Z
 ZAP_WIN_PATHS = [ZAP_DIR / "zap.bat", ZAP_DIR / "ZAP.exe"]
 
 
-def run_zap(target_url: str, log_path: Path = ZAP_LOG, timeout: int = 600) -> tuple[int, str]:
+def run_zap(
+    target_url: str,
+    log_path: Path = ZAP_LOG,
+    timeout: int = 600,
+    endpoints: list[str] | None = None,
+) -> tuple[int, str]:
     """
     Run OWASP ZAP in headless mode against target_url.
     Saves output to log_path. Returns (returncode, summary_message).
@@ -29,10 +34,32 @@ def run_zap(target_url: str, log_path: Path = ZAP_LOG, timeout: int = 600) -> tu
         )
         return -1, "OWASP ZAP not found; see log."
 
-    # ZAP headless baseline: -cmd -quickurl URL -quickout report
-    # zap.bat must run from ZAP dir so java -jar zap-*.jar finds the JAR
+    # ZAP headless baseline: -cmd -quickurl URL -quickprogress
+    # If endpoint list is provided, scan only high-value discovered endpoints.
     zap_cwd = Path(cmd).parent if Path(cmd).is_file() else None
-    argv = [cmd, "-cmd", "-quickurl", target_url, "-quickprogress"]
-    code, out, err = run_capture(argv, log_path, timeout=timeout, cwd=zap_cwd)
-    msg = "OWASP ZAP scan complete." if code == 0 else f"OWASP ZAP finished with code {code}."
-    return code, msg
+    targets = [target_url]
+    if endpoints:
+        targeted = [e for e in endpoints if e.startswith(("http://", "https://"))]
+        if targeted:
+            targets = targeted[:25]
+
+    aggregate_lines: list[str] = []
+    final_code = 0
+    per_target_timeout = max(60, timeout // max(len(targets), 1))
+    for idx, t in enumerate(targets):
+        part_log = log_path.with_name(f"zap_scan_{idx}.txt")
+        argv = [cmd, "-cmd", "-quickurl", t, "-quickprogress"]
+        code, out, err = run_capture(argv, part_log, timeout=per_target_timeout, cwd=zap_cwd)
+        final_code = code if code != 0 and final_code == 0 else final_code
+        aggregate_lines.append(f"## Target: {t}")
+        aggregate_lines.append(part_log.read_text(encoding="utf-8", errors="replace"))
+        aggregate_lines.append("")
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("\n".join(aggregate_lines), encoding="utf-8", errors="replace")
+    msg = (
+        f"OWASP ZAP targeted scan complete ({len(targets)} target(s))."
+        if final_code == 0
+        else f"OWASP ZAP finished with code {final_code}."
+    )
+    return final_code, msg

@@ -48,6 +48,7 @@ def run_gobuster(
     log_path: Path = GOBUSTER_LOG,
     timeout: int = 300,
     wordlist: str | None = None,
+    high_value_paths: list[str] | None = None,
 ) -> tuple[int, str]:
     """
     Run gobuster dir against target. Save full output to log_path.
@@ -67,6 +68,27 @@ def run_gobuster(
         return -1, "Gobuster not found; see log."
 
     wl = _get_wordlist_path(wordlist)
+    # Targeted deep mode: only recurse into high-value paths discovered by ffuf.
+    if high_value_paths:
+        focused = [p for p in high_value_paths if any(k in p.lower() for k in ("/admin", "/api", "/dashboard", "/manage", "/console"))]
+        if not focused:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text("Gobuster skipped: no high-value paths for targeted recursive scan.", encoding="utf-8")
+            return 0, "Gobuster skipped (no high-value paths)."
+
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        tiny_wl = LOG_DIR / "gobuster_targeted_words.txt"
+        tiny_wl.write_text(
+            "\n".join(
+                [
+                    "v1", "v2", "internal", "private", "debug", "test",
+                    "backup", "old", "dev", "staging", "users", "admin",
+                    "settings", "config", "export", "import", "docs", "swagger",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        wl = str(tiny_wl)
     base_argv = [
         cmd, "dir", "-u", target_url, "-w", wl, "-t", "15",
         "-k", "--follow-redirect", "-e",

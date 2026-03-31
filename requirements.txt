@@ -6,3 +6,8 @@ pyinstaller>=6.0.0
 
 # Optional: for richer CLI (no hard dependency)
 # rich>=13.0.0
+
+# Stateful architecture integrations
+paramspider
+arjun
+uro

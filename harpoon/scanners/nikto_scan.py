@@ -60,11 +60,17 @@ def run_nikto(
     target_url: str,
     log_path: Path = NIKTO_LOG,
     timeout: int = 600,
+    skip_if_waf: bool = False,
 ) -> tuple[int, str]:
     """
     Run Nikto against target_url.
     Saves output to log_path. Returns (returncode, summary_message).
     """
+    if skip_if_waf:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("Nikto skipped due to WAF_PRESENT=True policy.", encoding="utf-8")
+        return 0, "Nikto skipped (WAF detected)."
+
     argv_prefix, display, uses_wsl = _find_nikto()
     if not argv_prefix:
         log_path.parent.mkdir(parents=True, exist_ok=True)

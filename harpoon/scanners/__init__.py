@@ -1,1 +1,1 @@
-# Scanners: ZAP, Sqlmap, Gobuster, Nmap, Nikto, ffuf
+# Stateful pipeline scanners: passive recon, probing, fuzzing, validation
