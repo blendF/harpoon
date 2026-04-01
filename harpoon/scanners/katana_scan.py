@@ -2,14 +2,33 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from harpoon.config import KATANA_CMD, KATANA_LOG
 from harpoon.runner import find_cmd, run_capture_json
 
 
+def _wsl_has(tool: str) -> bool:
+    try:
+        return subprocess.run(["wsl", "which", tool], capture_output=True, timeout=10).returncode == 0
+    except Exception:
+        return False
+
+
+def _wsl_path(p: str) -> str:
+    p = p.replace("\\", "/")
+    if len(p) >= 2 and p[1] == ":":
+        return f"/mnt/{p[0].lower()}{p[2:]}"
+    return p
+
+
 def run_katana(targets: list[str], log_path: Path = KATANA_LOG, timeout: int = 420) -> tuple[int, list[str], str]:
     cmd = find_cmd("katana") or find_cmd(KATANA_CMD.split()[0])
+    use_wsl = False
+    if not cmd and _wsl_has("katana"):
+        cmd = "wsl"
+        use_wsl = True
     if not cmd:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text(
@@ -23,7 +42,9 @@ def run_katana(targets: list[str], log_path: Path = KATANA_LOG, timeout: int = 4
 
     input_file = log_path.with_name("katana_input.txt")
     input_file.write_text("\n".join(sorted(set(targets))), encoding="utf-8")
-    argv = [cmd, "-list", str(input_file), "-silent", "-jc", "-jsonl"]
+    input_path = _wsl_path(str(input_file)) if use_wsl else str(input_file)
+    base_args = ["-list", input_path, "-silent", "-jc", "-jsonl"]
+    argv = ["wsl", "katana"] + base_args if use_wsl else [cmd] + base_args
     code, parsed, err = run_capture_json(argv, log_path, timeout=timeout)
 
     urls: set[str] = set()

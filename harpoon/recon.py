@@ -121,6 +121,25 @@ def dns_lookup(host: str) -> ReconInfo:
             info.cdn_name = cdn
             return info
 
+    try:
+        import urllib.request
+        req = urllib.request.Request(f"https://{host}", headers={"User-Agent": "Harpoon/Recon"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            headers = {k.lower(): v.lower() for k, v in resp.headers.items()}
+            server = headers.get("server", "")
+            all_vals = " ".join(headers.values())
+            for sig, name in _RDNS_PATTERNS.items():
+                if sig in server or sig in all_vals:
+                    info.is_cdn = True
+                    info.cdn_name = name
+                    return info
+            if "cf-ray" in headers:
+                info.is_cdn = True
+                info.cdn_name = "Cloudflare"
+                return info
+    except Exception:
+        pass
+
     return info
 
 

@@ -2,15 +2,26 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from harpoon.config import ARJUN_CMD, ARJUN_LOG
 from harpoon.runner import find_cmd, run_capture
 
 
+def _wsl_has(tool: str) -> bool:
+    try:
+        return subprocess.run(["wsl", "which", tool], capture_output=True, timeout=10).returncode == 0
+    except Exception:
+        return False
+
+
 def run_arjun(urls: list[str], log_path: Path = ARJUN_LOG, timeout: int = 360) -> tuple[int, list[str], str]:
     cmd = find_cmd("arjun") or find_cmd(ARJUN_CMD.split()[0])
-    if not cmd:
+    use_wsl = False
+    if not cmd and _wsl_has("arjun"):
+        use_wsl = True
+    if not cmd and not use_wsl:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("arjun not found. Install with: pip install arjun", encoding="utf-8")
         return -1, [], "arjun not found; skipped."
@@ -28,7 +39,7 @@ def run_arjun(urls: list[str], log_path: Path = ARJUN_LOG, timeout: int = 360) -
 
     for idx, url in enumerate(urls[:20]):
         part_json = log_path.with_name(f"arjun_{idx}.json")
-        argv = [cmd, "-u", url, "-oJ", str(part_json), "--passive"]
+        argv = ["wsl", "arjun", "-u", url, "-oJ", str(part_json), "--passive"] if use_wsl else [cmd, "-u", url, "-oJ", str(part_json), "--passive"]
         code, out, err = run_capture(argv, part_json.with_suffix(".log"), timeout=per_target_timeout)
         if code != 0 and final_code == 0:
             final_code = code

@@ -1,109 +1,40 @@
-# Penetration Test Report
+# Harpoon Stateful Pentest Report
 
-**Target:** https://juice-shop.herokuapp.com/
-**Date:** 2026-02-21 01:56
+**Target:** cybee.ai
+**Date:** 2026-04-01 02:30
 
 ---
 
 ## Executive Summary
 
-This report presents findings from an automated penetration test, organized by phase. Each finding includes its security impact and recommended actions.
+Assessment executed through a stateful 10-phase black-box pipeline with adaptive WAF policy and deterministic PoC generation.
+
+**Overall Risk Rating:** LOW
+
+## Toolchain Procedure (1 -> 10)
+
+1. Passive recon (subfinder, crt.sh, amass)
+2. Active DNS + infra filtering (dnsx + conditional nmap)
+3. HTTP probing + WAF detection (httpx + behavioral probe)
+4. Visual recon (gowitness)
+5. Directory/vhost fuzzing (ffuf primary, gobuster targeted)
+6. Advanced crawling + historical mining (katana + archives)
+7. JS analysis (endpoint + entropy secret detection)
+8. Parameter discovery (paramspider/arjun/ffuf params)
+9. Validation (nuclei, sqlmap, nikto conditional)
+10. Manual exploitation handoff + PoC statements
 
 ---
 
-## Phase 1: Reconnaissance
+## Findings Snapshot
 
-### DNS Recon
+- Nmap open services: 5
+- ffuf dir findings: 1828
+- ffuf vhost findings: 0
+- ffuf params findings: 24
+- Nuclei findings: 0
+- Generated PoCs: 0
 
-**Resolved IP(s):** 54.220.192.176, 54.73.53.134, 46.137.15.86
+## Actionable Proof of Exploitation
 
-**CDN/WAF:** None detected (direct host)
-
-### Network Discovery
-
-**Open ports and services:**
-
-| Port | Protocol | Service |
-|------|----------|---------|
-| 80 | tcp | http |
-| 443 | tcp | ssl/https |
-
-*Action:* Ensure only necessary ports are exposed. Close or restrict access to unused services.
-
-### Path Enumeration
-
-**Status:** Limited
-
-Server uses redirects or wildcard responses; automated enumeration was constrained.
-
-
----
-
-## Phase 2: Web Application Scanning
-
-### At Risk
-
-- **Content Security Policy (CSP) Header Not Set**
-  - Affected: https://juice-shop.herokuapp.com/ftp/encrypt.pyc, https://juice-shop.herokuapp.com/ftp/package-lock.json.bak, https://juice-shop.herokuapp.com/sitemap.xml
-  - *Remediation:* Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.
-
-- **Strict-Transport-Security Header Not Set**
-  - Affected: https://juice-shop.herokuapp.com/assets/public/favicon_js.ico, https://juice-shop.herokuapp.com/runtime.js, https://juice-shop.herokuapp.com/
-  - *Remediation:* Ensure that your web server, application server, load balancer, etc. is configured to enforce Strict-Transport-Security.
-
-### Review Recommended
-
-- **Cross-Domain Misconfiguration**
-  - Affected: https://juice-shop.herokuapp.com/, https://juice-shop.herokuapp.com/polyfills.js, https://juice-shop.herokuapp.com/robots.txt
-  - *Remediation:* Ensure that sensitive data is not available in an unauthenticated manner (using IP address white-listing, for instance).  Configure the "Access-Control-Allow-Origin" HTTP header to a more restrictive set of domains, or remove all CORS headers entirely, to allow the web browser to enforce the Same Or
-
-- **Cross-Domain JavaScript Source File Inclusion**
-  - Affected: https://juice-shop.herokuapp.com/, https://juice-shop.herokuapp.com/sitemap.xml
-  - *Remediation:* Ensure JavaScript source files are loaded from only trusted sources, and the sources can't be controlled by end users of the application.
-
-- **Modern Web Application**
-  - Affected: https://juice-shop.herokuapp.com/, https://juice-shop.herokuapp.com/sitemap.xml
-  - *Remediation:* This is an informational alert and so no changes are required.
-
-### Low Priority / Informational
-
-- Timestamp Disclosure - Unix
-- Information Disclosure - Suspicious Comments
-- Re-examine Cache-control Directives
-
----
-
-## Phase 3: Input Validation Testing
-
-**Status:** Limited
-
-No URL parameters or form fields with injectable patterns were discovered during automated crawl. Manual testing of specific input fields recommended.
-
-*Action:* Manually test input fields (search, login, forms) for SQL injection.
-
----
-
-## Phase 4: Exploitation
-
-**Status:** At Risk
-
-Possible remote access obtained. Immediate remediation required.
-
----
-
-## Appendix A: Tools Used
-
-| Tool | Abbreviation | Purpose |
-|------|--------------|---------|
-| Nmap | Network Mapper | Port scan, service detection, OS fingerprint |
-| Gobuster | Dir enum | Directory/file enumeration |
-| OWASP ZAP | ZAP (Zed Attack Proxy) | Web app vulnerability scanning |
-| Sqlmap | SQLi | SQL injection testing |
-| Nuclei | CVE/templates | Template-based vulnerability scanning |
-| Metasploit Framework | MSF | Exploitation framework |
-
----
-
-## Appendix B: Raw Logs
-
-*Detailed tool output is stored in `harpoon_logs/` for technical review.*
+*No deterministic PoCs generated from current validation outputs.*
