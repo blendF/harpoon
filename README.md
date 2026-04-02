@@ -32,9 +32,20 @@ Gobuster has been removed by design; ffuf is the primary content and parameter f
 
 ## Run
 
+**Recommended on Linux/WSL** (adds `~/go/bin` and `~/.local/bin` to PATH and sources `.harpoon.env` if present):
+
 ```bash
-python main.py
+bash scripts/run_harpoon.sh
 ```
+
+Or run Python directly (you must export PATH yourself if tools live in `~/go/bin`):
+
+```bash
+cp .harpoon.env.example .harpoon.env   # edit values; loaded automatically before config
+python3 main.py
+```
+
+`HARPOON_USE_BUNDLED_WORDLISTS=1` only satisfies the **SecLists** check. It does **not** install missing Go/Python tools — run `bash scripts/install_harpoon_tools.sh` for those.
 
 ## HTML Report
 

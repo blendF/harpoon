@@ -27,6 +27,9 @@ harpoon_assessment_*.html
 .idea/
 .cursor/
 
+# Local Harpoon env (copy from .harpoon.env.example)
+.harpoon.env
+
 # OS
 Thumbs.db
 Desktop.ini

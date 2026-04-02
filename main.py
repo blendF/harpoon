@@ -7,7 +7,12 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_REPO_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(_REPO_ROOT))
+
+from harpoon.envfile import load_harpoon_env
+
+load_harpoon_env(_REPO_ROOT)
 
 from harpoon.cli import Counters, critical, estimate_duration, info, phase_banner, success, warn
 from harpoon.config import (

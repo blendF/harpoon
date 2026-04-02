@@ -168,25 +168,57 @@ def find_missing_dependencies() -> list[str]:
     return sorted(set(missing))
 
 
+def _warn_bad_seclists_env() -> None:
+    raw = os.environ.get("HARPOON_SECLISTS_DIR", "").strip()
+    if not raw:
+        return
+    p = Path(raw)
+    if not p.is_dir():
+        warn(f"HARPOON_SECLISTS_DIR is set to {raw!r} but that folder does not exist.")
+        warn("Fix: use the real SecLists path (often /usr/share/seclists), or unset it and set HARPOON_USE_BUNDLED_WORDLISTS=1")
+
+
 def check_dependencies() -> None:
+    _warn_bad_seclists_env()
     missing = find_missing_dependencies()
     if not missing:
         return
 
     error("Pre-flight failed: some required tools or SecLists are missing.")
-    warn(f"Missing ({len(missing)}): {', '.join(missing)}")
+
+    tools_missing = [m for m in missing if m != "seclists"]
+    need_seclists = "seclists" in missing
+
+    if need_seclists and tools_missing:
+        warn(f"Missing SecLists + {len(tools_missing)} tool(s).")
+    elif need_seclists:
+        warn("Missing SecLists (wordlist directory).")
+    else:
+        warn(f"Missing {len(tools_missing)} executable(s) on PATH (env vars cannot install these).")
+
+    if tools_missing:
+        warn(f"Tools: {', '.join(tools_missing)}")
 
     script = install_script_path()
+    run_sh = BASE_DIR / "scripts" / "run_harpoon.sh"
     if script:
-        warn("Install everything on Debian/Ubuntu/Kali/WSL with:")
+        warn("Install missing tools (Debian/Ubuntu/Kali/WSL):")
         warn(f"  bash {script}")
     else:
-        warn("Clone the Harpoon repo so scripts/install_harpoon_tools.sh is available, or install tools manually.")
+        warn("Install the Harpoon scripts/ folder or add each tool to PATH manually.")
 
-    warn("If SecLists is installed elsewhere, set: export HARPOON_SECLISTS_DIR=/path/to/seclists")
-    warn("To use only bundled wordlists (no SecLists): export HARPOON_USE_BUNDLED_WORDLISTS=1")
+    if run_sh.is_file():
+        warn("Or run with PATH fixes + optional .harpoon.env (no manual export each time):")
+        warn(f"  bash {run_sh}")
+
+    if need_seclists:
+        warn("SecLists: install package seclists, or set HARPOON_SECLISTS_DIR to the real directory (e.g. /usr/share/seclists).")
+        warn("Alternatively: HARPOON_USE_BUNDLED_WORDLISTS=1 (copy lines from .harpoon.env.example into .harpoon.env).")
+
+    if tools_missing:
+        warn("After go install / pip install, ensure PATH includes: $HOME/go/bin and $HOME/.local/bin")
 
     if _on_windows():
-        warn("On Windows, either add tools to PATH or run Harpoon inside WSL so the same binaries are visible.")
+        warn("On Windows, use WSL and bash scripts/run_harpoon.sh, or align PATH with the Python you run.")
 
     sys.exit(1)
