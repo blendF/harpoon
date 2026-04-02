@@ -24,9 +24,11 @@ Gobuster has been removed by design; ffuf is the primary content and parameter f
 ## Requirements
 
 - Python 3.10+
-- SecLists available at `/usr/share/seclists/` (or set `HARPOON_SECLISTS_DIR`)
-- ProjectDiscovery tools installed (see install block emitted by `harpoon/preflight.py`)
-- Python dependencies in `requirements.txt`
+- SecLists at `/usr/share/seclists/`, or set `HARPOON_SECLISTS_DIR` to your checkout
+- Or, if you cannot install SecLists: `export HARPOON_USE_BUNDLED_WORDLISTS=1` (uses `harpoon/wordlists/` only; narrower coverage)
+- All external tools on your `PATH` (see pre-flight check). On **Windows**, run Harpoon from **WSL** or ensure the same binaries are visible to the Python you use
+- One-shot installer (Debian/Ubuntu/Kali/WSL): `bash scripts/install_harpoon_tools.sh`
+- Python dependencies: `pip install -r requirements.txt`
 
 ## Run
 
