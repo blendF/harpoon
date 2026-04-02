@@ -1,129 +1,129 @@
-"""Generic runner: run commands, capture output, and stream JSON lines."""
-import shutil
-import subprocess
+"""Async command runner for Harpoon."""
+from __future__ import annotations
+
+import asyncio
 import json
+import os
+import shutil
 from pathlib import Path
-from typing import Callable, Optional, Any
+from typing import Any, Callable
 
 
-def find_cmd(cmd: str) -> Optional[str]:
+def find_cmd(cmd: str) -> str | None:
     """Return full path if command exists in PATH, else None."""
     return shutil.which(cmd)
 
 
-def run_capture(
-    argv: list,
+async def run_tool(
+    argv: list[str],
     log_path: Path,
-    timeout: Optional[int] = None,
-    env: Optional[dict] = None,
-    cwd: Optional[Path] = None,
+    timeout: int | None = None,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
 ) -> tuple[int, str, str]:
-    """
-    Run argv, write stdout+stderr to log_path, return (returncode, stdout, stderr).
-    Uses UTF-8 to avoid Windows cp1252 decode errors.
-    """
+    """Run command asynchronously and write combined output to log."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        result = subprocess.run(
-            argv,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
             cwd=str(cwd) if cwd else None,
-            env={**(env or {}), **__import__("os").environ},
+            env={**os.environ, **(env or {})},
         )
-        out, err = result.stdout or "", result.stderr or ""
-        combined = f"=== stdout ===\n{out}\n=== stderr ===\n{err}"
-        log_path.write_text(combined, encoding="utf-8", errors="replace")
-        return result.returncode, out, err
-    except subprocess.TimeoutExpired:
-        log_path.write_text("Command timed out.", encoding="utf-8")
-        return -1, "", "Timeout"
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            log_path.write_text("Command timed out.", encoding="utf-8")
+            return -1, "", "Timeout"
     except FileNotFoundError:
         log_path.write_text(f"Command not found: {argv[0]}", encoding="utf-8")
         return -1, "", "Command not found"
-    except Exception as e:
-        log_path.write_text(str(e), encoding="utf-8")
-        return -1, "", str(e)
+    except Exception as exc:
+        log_path.write_text(str(exc), encoding="utf-8")
+        return -1, "", str(exc)
+
+    out = stdout_b.decode("utf-8", errors="replace") if stdout_b else ""
+    err = stderr_b.decode("utf-8", errors="replace") if stderr_b else ""
+    combined = f"=== stdout ===\n{out}\n=== stderr ===\n{err}"
+    log_path.write_text(combined, encoding="utf-8", errors="replace")
+    return int(proc.returncode or 0), out, err
 
 
-def run_capture_json(
+async def run_tool_json(
     argv: list[str],
     log_path: Path,
     on_json: Callable[[dict[str, Any]], None] | None = None,
-    timeout: Optional[int] = None,
-    env: Optional[dict] = None,
-    cwd: Optional[Path] = None,
+    timeout: int | None = None,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
 ) -> tuple[int, list[dict[str, Any]], str]:
-    """
-    Run command and parse JSON/JSONL lines from stdout in near real-time.
-
-    Returns (returncode, parsed_objects, stderr_text).
-    Raw combined output still gets written to log_path for traceability.
-    """
+    """Run command asynchronously and parse JSON/JSONL stdout lines."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
     parsed: list[dict[str, Any]] = []
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
 
     try:
-        proc = subprocess.Popen(
-            argv,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
             cwd=str(cwd) if cwd else None,
-            env={**__import__("os").environ, **(env or {})},
+            env={**os.environ, **(env or {})},
         )
 
-        assert proc.stdout is not None
-        assert proc.stderr is not None
+        async def _drain_stdout() -> None:
+            assert proc.stdout is not None
+            while True:
+                raw = await proc.stdout.readline()
+                if not raw:
+                    break
+                line = raw.decode("utf-8", errors="replace").rstrip("\n")
+                stdout_lines.append(line)
+                s = line.strip()
+                if not s:
+                    continue
+                try:
+                    obj = json.loads(s)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(obj, dict):
+                    parsed.append(obj)
+                    if on_json:
+                        try:
+                            on_json(obj)
+                        except Exception:
+                            pass
 
-        for raw_line in proc.stdout:
-            line = raw_line.rstrip("\n")
-            stdout_lines.append(line)
-            striped = line.strip()
-            if not striped:
-                continue
-            try:
-                obj = json.loads(striped)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(obj, dict):
-                parsed.append(obj)
-                if on_json:
-                    try:
-                        on_json(obj)
-                    except Exception:
-                        # Never crash pipeline on callback failures.
-                        pass
+        async def _drain_stderr() -> None:
+            assert proc.stderr is not None
+            while True:
+                raw = await proc.stderr.readline()
+                if not raw:
+                    break
+                stderr_lines.append(raw.decode("utf-8", errors="replace").rstrip("\n"))
 
-        # collect stderr after stdout drain
-        stderr_lines = proc.stderr.read().splitlines()
-        code = proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
+        tasks = [asyncio.create_task(_drain_stdout()), asyncio.create_task(_drain_stderr())]
         try:
-            proc.kill()  # type: ignore[name-defined]
-        except Exception:
-            pass
-        log_path.write_text("Command timed out.", encoding="utf-8")
-        return -1, parsed, "Timeout"
+            await asyncio.wait_for(proc.wait(), timeout=timeout)
+            await asyncio.gather(*tasks)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            for task in tasks:
+                task.cancel()
+            log_path.write_text("Command timed out.", encoding="utf-8")
+            return -1, parsed, "Timeout"
     except FileNotFoundError:
         log_path.write_text(f"Command not found: {argv[0]}", encoding="utf-8")
         return -1, parsed, "Command not found"
-    except Exception as e:
-        log_path.write_text(str(e), encoding="utf-8")
-        return -1, parsed, str(e)
+    except Exception as exc:
+        log_path.write_text(str(exc), encoding="utf-8")
+        return -1, parsed, str(exc)
 
-    combined = (
-        "=== stdout ===\n"
-        + "\n".join(stdout_lines)
-        + "\n=== stderr ===\n"
-        + "\n".join(stderr_lines)
-    )
+    combined = "=== stdout ===\n" + "\n".join(stdout_lines) + "\n=== stderr ===\n" + "\n".join(stderr_lines)
     log_path.write_text(combined, encoding="utf-8", errors="replace")
-    return code, parsed, "\n".join(stderr_lines)
+    return int(proc.returncode or 0), parsed, "\n".join(stderr_lines)

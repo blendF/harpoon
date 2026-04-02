@@ -1,11 +1,11 @@
 """Nuclei vulnerability scan with context from Nmap and Gobuster."""
-import subprocess
+from __future__ import annotations
+
 from pathlib import Path
 
 from harpoon.config import (
     FFUF_DIR_LOG,
     FFUF_VHOST_LOG,
-    GOBUSTER_LOG,
     NMAP_LOG,
     NUCLEI_CMD,
     NUCLEI_LOG,
@@ -13,8 +13,8 @@ from harpoon.config import (
     NUCLEI_LOCAL_CWD,
     NUCLEI_TARGETS_FILE,
 )
-from harpoon.nuclei_context import build_nuclei_targets, build_nuclei_targets_from_state
-from harpoon.runner import find_cmd, run_capture
+from harpoon.nuclei_context import build_nuclei_targets_from_state
+from harpoon.runner import find_cmd, run_tool
 from harpoon.state import PipelineStateManager
 
 
@@ -28,24 +28,16 @@ def _find_nuclei() -> str | None:
     return find_cmd("nuclei") or find_cmd(NUCLEI_CMD.split()[0])
 
 
-def _ensure_templates(cmd: str) -> None:
+async def _ensure_templates(cmd: str, log_path: Path) -> None:
     """Run -update-templates so first-run users get template data."""
-    try:
-        subprocess.run(
-            [cmd, "-update-templates"],
-            capture_output=True,
-            timeout=120,
-        )
-    except Exception:
-        pass
+    await run_tool([cmd, "-update-templates"], log_path.with_name("nuclei_templates_update.log"), timeout=120)
 
 
-def run_nuclei(
+async def run_nuclei(
     base_url: str,
     host: str,
     log_path: Path = NUCLEI_LOG,
     nmap_log: Path = NMAP_LOG,
-    gobuster_log: Path = GOBUSTER_LOG,
     targets_file: Path = NUCLEI_TARGETS_FILE,
     timeout: int = 600,
     is_cdn: bool = False,
@@ -70,7 +62,7 @@ def run_nuclei(
         )
         return -1, "Nuclei not found; see log."
 
-    _ensure_templates(cmd)
+    await _ensure_templates(cmd, log_path)
 
     if state_manager:
         targets, tags = build_nuclei_targets_from_state(
@@ -80,15 +72,7 @@ def run_nuclei(
             targets_file=targets_file,
         )
     else:
-        targets, tags = build_nuclei_targets(
-            base_url=base_url,
-            nmap_log_path=nmap_log,
-            gobuster_log_path=gobuster_log,
-            host=host,
-            targets_file=targets_file,
-            ffuf_dir_log=ffuf_dir_log,
-            ffuf_vhost_log=ffuf_vhost_log,
-        )
+        targets, tags = [base_url], ["cve", "generic"]
     if tech_tags:
         tags = sorted(set(tags) | {t.lower() for t in tech_tags if t})
 
@@ -117,7 +101,7 @@ def run_nuclei(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(header, encoding="utf-8")
 
-    code, out, err = run_capture(argv, log_path, timeout=timeout)
+    code, out, err = await run_tool(argv, log_path, timeout=timeout)
 
     try:
         existing = log_path.read_text(encoding="utf-8", errors="replace")

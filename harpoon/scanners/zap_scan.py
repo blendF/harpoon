@@ -3,14 +3,14 @@ import os
 from pathlib import Path
 
 from harpoon.config import ZAP_CMD, ZAP_LOG
-from harpoon.runner import find_cmd, run_capture
+from harpoon.runner import find_cmd, run_tool
 
 # Common Windows ZAP install path (winget)
 ZAP_DIR = Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "ZAP" / "Zed Attack Proxy"
 ZAP_WIN_PATHS = [ZAP_DIR / "zap.bat", ZAP_DIR / "ZAP.exe"]
 
 
-def run_zap(
+async def run_zap(
     target_url: str,
     log_path: Path = ZAP_LOG,
     timeout: int = 600,
@@ -49,7 +49,7 @@ def run_zap(
     for idx, t in enumerate(targets):
         part_log = log_path.with_name(f"zap_scan_{idx}.txt")
         argv = [cmd, "-cmd", "-quickurl", t, "-quickprogress"]
-        code, out, err = run_capture(argv, part_log, timeout=per_target_timeout, cwd=zap_cwd)
+        code, out, err = await run_tool(argv, part_log, timeout=per_target_timeout, cwd=zap_cwd)
         final_code = code if code != 0 and final_code == 0 else final_code
         aggregate_lines.append(f"## Target: {t}")
         aggregate_lines.append(part_log.read_text(encoding="utf-8", errors="replace"))

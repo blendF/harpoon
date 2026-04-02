@@ -31,6 +31,7 @@ def _parse_nuclei_jsonl(nuclei_log: Path) -> list[dict]:
                 "cve": cve if isinstance(cve, str) else "",
                 "matched_at": obj.get("matched-at", obj.get("host", "")),
                 "curl_command": obj.get("curl-command", ""),
+                "raw_http_request": obj.get("request", ""),
                 "severity": info.get("severity", ""),
             }
         )
@@ -59,7 +60,8 @@ def _parse_sqlmap_log(sqlmap_log: Path) -> list[dict]:
             "parameter": param_match.group(1).strip() if param_match else "",
             "dbms": dbms_match.group(1).strip() if dbms_match else "",
             "payload": payload_match.group(1).strip() if payload_match else "",
-            "curl_command": "",
+            "curl_command": f"curl -i '{url_match.group(1).strip() if url_match else ''}'",
+            "raw_http_request": "",
             "severity": "high",
         }
     )
@@ -78,7 +80,9 @@ def generate_pocs(
         cve = item.get("cve", "")
         vuln_ref = f"{name} ({cve})" if cve else name
         path = item.get("matched_at", "unknown target")
-        proof = item.get("curl_command") or item.get("payload") or "Refer to raw logs for request reproduction."
+        curl_cmd = item.get("curl_command") or ""
+        raw_http = item.get("raw_http_request") or ""
+        proof = curl_cmd or item.get("payload") or "Refer to raw logs for request reproduction."
         statement = (
             f"Using and finding [{vuln_ref}] - you can exploit this vulnerability "
             f"on this path: {path} using the following proof of concept: {proof}"
@@ -86,6 +90,8 @@ def generate_pocs(
         poc_entries.append(
             {
                 **item,
+                "curl_command": curl_cmd,
+                "raw_http_request": raw_http,
                 "poc_statement": statement,
             }
         )

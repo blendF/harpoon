@@ -18,6 +18,9 @@ venv/
 
 # Logs (generated at runtime)
 harpoon_logs/
+*.db
+*.sqlite3
+harpoon_assessment_*.html
 
 # IDE
 .vscode/

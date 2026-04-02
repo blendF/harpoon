@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from harpoon.config import NMAP_CMD, NMAP_LOG
-from harpoon.runner import find_cmd, run_capture
+from harpoon.runner import find_cmd, run_tool
 
 # Common Windows Nmap paths (subprocess may not inherit full PATH)
 NMAP_WIN_PATHS = [
@@ -39,7 +39,7 @@ def _is_cdn_ip(ip: str, cdn_nets: list[ipaddress._BaseNetwork]) -> bool:
     return any(addr in net for net in cdn_nets)
 
 
-def run_nmap(
+async def run_nmap(
     target: str | list[str],
     log_path: Path = NMAP_LOG,
     timeout: int = 600,
@@ -77,6 +77,6 @@ def run_nmap(
         return 0, "", "Nmap skipped (CDN edge IPs only)."
 
     argv = [cmd, "-sV", "-sC", "-O", "-v", "--reason"] + filtered
-    code, out, err = run_capture(argv, log_path, timeout=timeout)
+    code, out, err = await run_tool(argv, log_path, timeout=timeout)
     msg = "Nmap scan complete." if code == 0 else f"Nmap finished with code {code}."
     return code, out, msg

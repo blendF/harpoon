@@ -1,15 +1,14 @@
 """Sqlmap scan; save output to file."""
 from pathlib import Path
 
-from harpoon.config import GOBUSTER_LOG, SQLMAP_CMD, SQLMAP_LOG, SQLMAP_URLS_FILE
-from harpoon.nuclei_context import parse_gobuster_paths
-from harpoon.runner import find_cmd, run_capture
+from harpoon.config import SQLMAP_CMD, SQLMAP_LOG, SQLMAP_URLS_FILE
+from harpoon.runner import find_cmd, run_tool
 
 
-def run_sqlmap(
+async def run_sqlmap(
     target_url: str,
     log_path: Path = SQLMAP_LOG,
-    gobuster_log: Path | None = GOBUSTER_LOG,
+    gobuster_log: Path | None = None,
     urls_file: Path = SQLMAP_URLS_FILE,
     timeout: int = 300,
     waf_present: bool = False,
@@ -31,17 +30,6 @@ def run_sqlmap(
 
     base = target_url.rstrip("/")
     urls: list[str] = [base]
-
-    if gobuster_log and gobuster_log.exists():
-        try:
-            text = gobuster_log.read_text(encoding="utf-8", errors="replace")
-            paths = parse_gobuster_paths(text)
-            for p in paths[:15]:
-                url = f"{base}{p}" if p.startswith("/") else f"{base}/{p}"
-                if url not in urls:
-                    urls.append(url)
-        except OSError:
-            pass
 
     if discovered_params:
         for item in discovered_params[:40]:
@@ -73,6 +61,6 @@ def run_sqlmap(
     if waf_present:
         argv.extend(["--tamper=space2comment,randomcase"])
 
-    code, out, err = run_capture(argv, log_path, timeout=timeout)
+    code, out, err = await run_tool(argv, log_path, timeout=timeout)
     msg = "Sqlmap scan complete." if code == 0 else f"Sqlmap finished with code {code}."
     return code, msg

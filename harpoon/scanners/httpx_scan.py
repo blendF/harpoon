@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from harpoon.config import HTTPX_CMD, HTTPX_LOG
-from harpoon.runner import find_cmd, run_capture_json
+from harpoon.runner import find_cmd, run_tool_json
 
 
 def _wsl_has(tool: str) -> bool:
@@ -23,7 +23,7 @@ def _wsl_path(p: str) -> str:
     return p
 
 
-def run_httpx(targets: list[str], log_path: Path = HTTPX_LOG, timeout: int = 300) -> tuple[int, list[dict], str]:
+async def run_httpx(targets: list[str], log_path: Path = HTTPX_LOG, timeout: int = 300) -> tuple[int, list[dict], str]:
     cmd = find_cmd("httpx") or find_cmd(HTTPX_CMD.split()[0])
     use_wsl = False
     if not cmd and _wsl_has("httpx"):
@@ -55,7 +55,7 @@ def run_httpx(targets: list[str], log_path: Path = HTTPX_LOG, timeout: int = 300
     ]
     argv = ["wsl", "httpx"] + base_args if use_wsl else [cmd] + base_args
 
-    code, parsed, err = run_capture_json(argv, log_path, timeout=timeout)
+    code, parsed, err = await run_tool_json(argv, log_path, timeout=timeout)
     results: list[dict] = []
     for item in parsed:
         url = item.get("url") or item.get("input")

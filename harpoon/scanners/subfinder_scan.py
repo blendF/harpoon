@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from harpoon.config import SUBFINDER_CMD, SUBFINDER_LOG
-from harpoon.runner import find_cmd, run_capture
+from harpoon.runner import find_cmd, run_tool
 
 
 def _wsl_has(tool: str) -> bool:
@@ -15,7 +15,7 @@ def _wsl_has(tool: str) -> bool:
         return False
 
 
-def run_subfinder(domain: str, log_path: Path = SUBFINDER_LOG, timeout: int = 180) -> tuple[int, list[str], str]:
+async def run_subfinder(domain: str, log_path: Path = SUBFINDER_LOG, timeout: int = 180) -> tuple[int, list[str], str]:
     cmd = find_cmd("subfinder") or find_cmd(SUBFINDER_CMD.split()[0])
     if not cmd and _wsl_has("subfinder"):
         cmd = "WSL"
@@ -28,7 +28,7 @@ def run_subfinder(domain: str, log_path: Path = SUBFINDER_LOG, timeout: int = 18
         return -1, [], "subfinder not found; skipped."
 
     argv = ["wsl", "subfinder", "-d", domain, "-silent"] if cmd == "WSL" else [cmd, "-d", domain, "-silent"]
-    code, out, err = run_capture(argv, log_path, timeout=timeout)
+    code, out, err = await run_tool(argv, log_path, timeout=timeout)
     subdomains = sorted({ln.strip().lower() for ln in out.splitlines() if ln.strip()})
     if code == 0:
         return 0, subdomains, f"subfinder discovered {len(subdomains)} subdomain(s)."

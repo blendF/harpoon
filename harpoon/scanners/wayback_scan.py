@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from harpoon.config import GAU_CMD, GAU_LOG, URO_CMD, URO_LOG, WAYBACKURLS_CMD, WAYBACK_LOG
-from harpoon.runner import find_cmd, run_capture
+from harpoon.runner import find_cmd, run_tool
 
 
 def _wsl_has(tool: str) -> bool:
@@ -15,7 +15,7 @@ def _wsl_has(tool: str) -> bool:
         return False
 
 
-def run_waybackurls(domain: str, timeout: int = 120) -> tuple[int, list[str], str]:
+async def run_waybackurls(domain: str, timeout: int = 120) -> tuple[int, list[str], str]:
     wayback_cmd = find_cmd("waybackurls") or find_cmd(WAYBACKURLS_CMD.split()[0])
     use_wsl = False
     if not wayback_cmd and _wsl_has("waybackurls"):
@@ -25,12 +25,12 @@ def run_waybackurls(domain: str, timeout: int = 120) -> tuple[int, list[str], st
         WAYBACK_LOG.write_text("waybackurls not found.", encoding="utf-8")
         return -1, [], "waybackurls not found; skipped."
     argv = ["wsl", "waybackurls", domain] if use_wsl else [wayback_cmd, domain]
-    code, out, err = run_capture(argv, WAYBACK_LOG, timeout=timeout)
+    code, out, err = await run_tool(argv, WAYBACK_LOG, timeout=timeout)
     urls = sorted({ln.strip() for ln in out.splitlines() if ln.strip().startswith(("http://", "https://"))})
     return code, urls, f"waybackurls discovered {len(urls)} URL(s)." if code == 0 else f"waybackurls finished with code {code}."
 
 
-def run_gau(domain: str, timeout: int = 120) -> tuple[int, list[str], str]:
+async def run_gau(domain: str, timeout: int = 120) -> tuple[int, list[str], str]:
     gau_cmd = find_cmd("gau") or find_cmd(GAU_CMD.split()[0])
     use_wsl = False
     if not gau_cmd and _wsl_has("gau"):
@@ -40,7 +40,7 @@ def run_gau(domain: str, timeout: int = 120) -> tuple[int, list[str], str]:
         GAU_LOG.write_text("gau not found.", encoding="utf-8")
         return -1, [], "gau not found; skipped."
     argv = ["wsl", "gau", domain] if use_wsl else [gau_cmd, domain]
-    code, out, err = run_capture(argv, GAU_LOG, timeout=timeout)
+    code, out, err = await run_tool(argv, GAU_LOG, timeout=timeout)
     urls = sorted({ln.strip() for ln in out.splitlines() if ln.strip().startswith(("http://", "https://"))})
     return code, urls, f"gau discovered {len(urls)} URL(s)." if code == 0 else f"gau finished with code {code}."
 

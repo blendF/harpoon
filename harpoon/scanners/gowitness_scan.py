@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from harpoon.config import GOWITNESS_CMD, GOWITNESS_LOG, LOG_DIR
-from harpoon.runner import find_cmd, run_capture
+from harpoon.runner import find_cmd, run_tool
 
 
 def _wsl_has(tool: str) -> bool:
@@ -15,7 +15,7 @@ def _wsl_has(tool: str) -> bool:
         return False
 
 
-def run_gowitness(targets: list[str], log_path: Path = GOWITNESS_LOG, timeout: int = 420) -> tuple[int, str]:
+async def run_gowitness(targets: list[str], log_path: Path = GOWITNESS_LOG, timeout: int = 420) -> tuple[int, str]:
     cmd = find_cmd("gowitness") or find_cmd(GOWITNESS_CMD.split()[0])
     use_wsl = False
     if not cmd and _wsl_has("gowitness"):
@@ -47,7 +47,7 @@ def run_gowitness(targets: list[str], log_path: Path = GOWITNESS_LOG, timeout: i
         "--screenshot-path",
         str(out_dir),
     ]
-    code, out, err = run_capture(argv, log_path, timeout=timeout)
+    code, out, err = await run_tool(argv, log_path, timeout=timeout)
     if code == 0:
         return 0, f"gowitness captured screenshots for {len(set(targets))} target(s)."
     return code, f"gowitness finished with code {code}."

@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 from harpoon.config import ARJUN_CMD, ARJUN_LOG
-from harpoon.runner import find_cmd, run_capture
+from harpoon.runner import find_cmd, run_tool
 
 
 def _wsl_has(tool: str) -> bool:
@@ -16,7 +16,7 @@ def _wsl_has(tool: str) -> bool:
         return False
 
 
-def run_arjun(urls: list[str], log_path: Path = ARJUN_LOG, timeout: int = 360) -> tuple[int, list[str], str]:
+async def run_arjun(urls: list[str], log_path: Path = ARJUN_LOG, timeout: int = 360) -> tuple[int, list[str], str]:
     cmd = find_cmd("arjun") or find_cmd(ARJUN_CMD.split()[0])
     use_wsl = False
     if not cmd and _wsl_has("arjun"):
@@ -40,7 +40,7 @@ def run_arjun(urls: list[str], log_path: Path = ARJUN_LOG, timeout: int = 360) -
     for idx, url in enumerate(urls[:20]):
         part_json = log_path.with_name(f"arjun_{idx}.json")
         argv = ["wsl", "arjun", "-u", url, "-oJ", str(part_json), "--passive"] if use_wsl else [cmd, "-u", url, "-oJ", str(part_json), "--passive"]
-        code, out, err = run_capture(argv, part_json.with_suffix(".log"), timeout=per_target_timeout)
+        code, out, err = await run_tool(argv, part_json.with_suffix(".log"), timeout=per_target_timeout)
         if code != 0 and final_code == 0:
             final_code = code
         logs.append(f"# URL: {url}\n{out}\n{err}")

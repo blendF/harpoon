@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 from harpoon.config import DNSX_CMD, DNSX_LOG
-from harpoon.runner import find_cmd, run_capture_json
+from harpoon.runner import find_cmd, run_tool_json
 
 
 def _wsl_has(tool: str) -> bool:
@@ -23,7 +23,7 @@ def _wsl_path(p: str) -> str:
     return p
 
 
-def run_dnsx(subdomains: list[str], log_path: Path = DNSX_LOG, timeout: int = 240) -> tuple[int, list[dict], str]:
+async def run_dnsx(subdomains: list[str], log_path: Path = DNSX_LOG, timeout: int = 240) -> tuple[int, list[dict], str]:
     cmd = find_cmd("dnsx") or find_cmd(DNSX_CMD.split()[0])
     use_wsl = False
     if not cmd and _wsl_has("dnsx"):
@@ -45,7 +45,7 @@ def run_dnsx(subdomains: list[str], log_path: Path = DNSX_LOG, timeout: int = 24
     if subdomains:
         base_args.extend(["-wd", subdomains[0].split(".", 1)[-1]])
     argv = ["wsl", "dnsx"] + base_args if use_wsl else [cmd] + base_args
-    code, parsed, err = run_capture_json(argv, log_path, timeout=timeout)
+    code, parsed, err = await run_tool_json(argv, log_path, timeout=timeout)
 
     resolved: list[dict] = []
     for item in parsed:

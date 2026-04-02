@@ -4,10 +4,15 @@
 # Packaging
 pyinstaller>=6.0.0
 
-# Optional: for richer CLI (no hard dependency)
-# rich>=13.0.0
+# Runtime dependencies
+rich
+aiosqlite
 
-# Stateful architecture integrations
+# Tool integrations
 paramspider
 arjun
 uro
+
+# Testing
+pytest
+pytest-asyncio

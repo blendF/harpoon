@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 from harpoon.config import NIKTO_CMD, NIKTO_LOCAL, NIKTO_LOCAL_CWD, NIKTO_LOG
-from harpoon.runner import find_cmd, run_capture
+from harpoon.runner import find_cmd, run_tool
 
 NIKTO_WIN_PATHS = [
     Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Nikto" / "nikto.pl",
@@ -56,7 +56,7 @@ def _find_nikto() -> tuple[list[str], str | None, bool]:
     return [], None, False
 
 
-def run_nikto(
+async def run_nikto(
     target_url: str,
     log_path: Path = NIKTO_LOG,
     timeout: int = 600,
@@ -92,7 +92,7 @@ def run_nikto(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(header, encoding="utf-8")
 
-    code, out, err = run_capture(argv, log_path, timeout=timeout)
+    code, out, err = await run_tool(argv, log_path, timeout=timeout)
 
     try:
         existing = log_path.read_text(encoding="utf-8", errors="replace")

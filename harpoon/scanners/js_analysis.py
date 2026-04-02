@@ -1,6 +1,7 @@
 """JavaScript endpoint and secret entropy analysis."""
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 import urllib.request
@@ -28,14 +29,14 @@ def _fetch_text(url: str, timeout: int = 10) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 
-def analyze_js_urls(js_urls: list[str], log_path: Path = JS_ANALYSIS_LOG) -> tuple[list[str], list[dict], str]:
+async def analyze_js_urls(js_urls: list[str], log_path: Path = JS_ANALYSIS_LOG) -> tuple[list[str], list[dict], str]:
     discovered_endpoints: set[str] = set()
     potential_secrets: list[dict] = []
     lines: list[str] = []
 
     for js_url in js_urls[:100]:
         try:
-            text = _fetch_text(js_url)
+            text = await asyncio.to_thread(_fetch_text, js_url)
         except Exception as exc:
             lines.append(f"[error] {js_url} -> {exc}")
             continue

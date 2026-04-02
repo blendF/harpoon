@@ -70,7 +70,7 @@ def _match_vendor(headers: dict[str, str]) -> tuple[str, float, list[str]]:
     return vendor, conf, evidence
 
 
-def detect_waf(url: str, threshold_limit: int = 600) -> WafResult:
+def detect_waf(url: str, threshold_limit: int = 600, cdncheck_result: dict | None = None) -> WafResult:
     """
     Multi-signal WAF detection:
     1) Header/vendor signatures
@@ -81,19 +81,36 @@ def detect_waf(url: str, threshold_limit: int = 600) -> WafResult:
     host = parsed.netloc or parsed.path
 
     baseline_status, baseline_headers = _fetch_status_and_headers(base_url)
-    probe_url = f"{base_url.rstrip('/')}/?id=1' OR '1'='1"
-    probe_status, probe_headers = _fetch_status_and_headers(probe_url)
+    sqli_probe_url = f"{base_url.rstrip('/')}/?id=1' OR '1'='1"
+    xss_probe_url = f"{base_url.rstrip('/')}/?q=<script>alert(1)</script>"
+    probe_status, probe_headers = _fetch_status_and_headers(sqli_probe_url)
+    xss_status, xss_headers = _fetch_status_and_headers(xss_probe_url)
 
     vendor, confidence, evidence = _match_vendor(baseline_headers)
     probe_vendor, probe_conf, probe_evidence = _match_vendor(probe_headers)
     if probe_conf > confidence:
         vendor, confidence = probe_vendor, probe_conf
     evidence.extend(probe_evidence)
+    xss_vendor, xss_conf, xss_evidence = _match_vendor(xss_headers)
+    if xss_conf > confidence:
+        vendor, confidence = xss_vendor, xss_conf
+    evidence.extend(xss_evidence)
+
+    if cdncheck_result:
+        cdn_name = str(cdncheck_result.get("cdn") or cdncheck_result.get("provider") or "").strip()
+        if cdn_name:
+            vendor = cdn_name
+            confidence = max(confidence, 0.85)
+            evidence.append(f"cdncheck:{cdn_name}")
 
     behavior_hit = baseline_status in (200, 301, 302) and probe_status in (403, 406, 429)
     if behavior_hit:
         confidence = max(confidence, 0.8)
         evidence.append(f"status_shift:{baseline_status}->{probe_status}")
+    xss_behavior_hit = baseline_status in (200, 301, 302) and xss_status in (403, 406, 429)
+    if xss_behavior_hit:
+        confidence = max(confidence, 0.82)
+        evidence.append(f"xss_status_shift:{baseline_status}->{xss_status}")
 
     if baseline_status == 0 and probe_status == 0:
         confidence = max(confidence, 0.4)
@@ -112,7 +129,7 @@ def detect_waf(url: str, threshold_limit: int = 600) -> WafResult:
         vendor=vendor or ("Unknown WAF" if is_present else ""),
         confidence=round(confidence, 3),
         baseline_status=baseline_status,
-        probe_status=probe_status,
+        probe_status=max(probe_status, xss_status),
         recommended_rate=rate,
         evidence=evidence,
     )
