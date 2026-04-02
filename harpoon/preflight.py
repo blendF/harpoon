@@ -9,6 +9,7 @@ from pathlib import Path
 
 from harpoon.cli import error, warn
 from harpoon.config import BASE_DIR, SECLISTS_DIR, WORDLISTS_DIR
+from harpoon.install_hints import format_install_hints
 
 # Logical tool id -> any of these executables on PATH (or extra file checks below)
 TOOL_CANDIDATES: dict[str, list[str]] = {
@@ -217,6 +218,9 @@ def check_dependencies() -> None:
 
     if tools_missing:
         warn("After go install / pip install, ensure PATH includes: $HOME/go/bin and $HOME/.local/bin")
+
+    for line in format_install_hints(missing):
+        warn(line)
 
     if _on_windows():
         warn("On Windows, use WSL and bash scripts/run_harpoon.sh, or align PATH with the Python you run.")

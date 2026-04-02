@@ -12,6 +12,8 @@ export GOPATH="${GOPATH:-$HOME/go}"
 export PATH="$PATH:$GOPATH/bin:/usr/local/go/bin"
 
 echo "==> Harpoon: ProjectDiscovery + related Go tools"
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+go install -v github.com/ffuf/ffuf/v2@latest
 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest
 go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
