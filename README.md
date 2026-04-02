@@ -27,13 +27,13 @@ Gobuster has been removed by design; ffuf is the primary content and parameter f
 - SecLists at `/usr/share/seclists/`, or set `HARPOON_SECLISTS_DIR` to your checkout
 - Or, if you cannot install SecLists: `export HARPOON_USE_BUNDLED_WORDLISTS=1` (uses `harpoon/wordlists/` only; narrower coverage)
 - All external tools on your `PATH` (see pre-flight check). On **Windows**, run Harpoon from **WSL** or ensure the same binaries are visible to the Python you use
-- One-shot installer (Debian/Ubuntu/Kali/WSL): `bash scripts/install_harpoon_tools.sh` (installs Go tools into `~/go/bin`, pulls **x8** from the upstream Rust release on Linux x86_64, and pip user tools into `~/.local/bin`)
-- If anything is still missing, Harpoon’s pre-flight step prints **exact** fix commands (apt / `go install` / pip / **x8** release URL). You normally do not need to hunt install steps elsewhere
-- Python dependencies: `pip install -r requirements.txt`
+- One-shot installer (Debian/Ubuntu/Kali/WSL): `bash scripts/install_harpoon_tools.sh` (Go tools → `~/go/bin`, **x8** from upstream release on Linux x86_64, Python deps into a repo **`.venv`** so Kali’s PEP 668 “externally managed” Python does not block installs)
+- If anything is still missing, Harpoon’s pre-flight step prints **exact** fix commands (apt / `go install` / venv pip / **x8** release URL)
+- Python dependencies (manual / without the shell installer): `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
 
 ## Run
 
-**Recommended on Linux/WSL** (adds `~/go/bin` and `~/.local/bin` to PATH and sources `.harpoon.env` if present):
+**Recommended on Linux/WSL** (adds `.venv/bin`, `~/go/bin`, `~/.local/bin`, `~/.cargo/bin` to PATH; uses `.venv`’s Python when present; sources `.harpoon.env` if present):
 
 ```bash
 bash scripts/run_harpoon.sh

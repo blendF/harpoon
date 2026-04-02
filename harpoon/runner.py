@@ -10,8 +10,27 @@ from typing import Any, Callable
 
 
 def find_cmd(cmd: str) -> str | None:
-    """Return full path if command exists in PATH, else None."""
-    return shutil.which(cmd)
+    """Resolve a CLI: PATH first, then ~/.local/bin, ~/go/bin, repo .venv (PEP 668 layout)."""
+    found = shutil.which(cmd)
+    if found:
+        return found
+    from harpoon.config import BASE_DIR
+
+    home = Path.home()
+    dirs = [
+        home / ".local" / "bin",
+        home / "go" / "bin",
+        BASE_DIR / ".venv" / "bin",
+        BASE_DIR / ".venv" / "Scripts",
+    ]
+    for stem in (cmd, f"{cmd}.exe"):
+        for d in dirs:
+            if not d.is_dir():
+                continue
+            p = d / stem
+            if p.is_file():
+                return str(p)
+    return None
 
 
 async def run_tool(

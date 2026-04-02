@@ -121,7 +121,15 @@ def _has_go() -> bool:
 
 def _local_bin(name: str) -> bool:
     home = Path.home()
-    for d in (home / ".local" / "bin", home / "go" / "bin"):
+    dirs = (
+        home / ".local" / "bin",
+        home / "go" / "bin",
+        BASE_DIR / ".venv" / "bin",
+        BASE_DIR / ".venv" / "Scripts",
+    )
+    for d in dirs:
+        if not d.is_dir():
+            continue
         p = d / name
         if p.is_file():
             return True
@@ -230,7 +238,10 @@ def check_dependencies() -> None:
         warn("Alternatively: HARPOON_USE_BUNDLED_WORDLISTS=1 (copy lines from .harpoon.env.example into .harpoon.env).")
 
     if tools_missing:
-        warn("After go install / pip install, ensure PATH includes: $HOME/go/bin and $HOME/.local/bin")
+        warn(
+            "After go install / pip into .venv, use bash scripts/run_harpoon.sh "
+            "(PATH: .venv/bin, ~/go/bin, ~/.local/bin) or activate .venv and export PATH yourself."
+        )
 
     for line in format_install_hints(missing):
         warn(line)

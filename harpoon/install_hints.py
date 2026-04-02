@@ -128,15 +128,20 @@ def format_install_hints(missing: list[str]) -> list[str]:
             lines.append(f"   {h}")
 
     if pip_specs:
-        lines.append("3) Python CLI — user install:")
-        lines.append(f"   python3 -m pip install --user {' '.join(sorted(pip_specs))}")
+        lines.append(
+            "3) Python packages — use a venv in the Harpoon repo (Kali/Debian PEP 668 blocks `pip install --user` on system Python):"
+        )
+        lines.append("   sudo apt install -y python3-venv   # if `python3 -m venv` fails")
+        lines.append("   python3 -m venv .venv && .venv/bin/pip install --upgrade pip")
+        lines.append("   .venv/bin/pip install -r requirements.txt")
+        lines.append(f"   .venv/bin/pip install {' '.join(sorted(pip_specs))}")
 
     if "seclists" in missing_set:
         lines.append("SecLists: bundled mode → set HARPOON_USE_BUNDLED_WORDLISTS=1 in .harpoon.env (no apt seclists needed).")
 
     lines.append(
-        "4) Then ensure PATH includes: $HOME/go/bin and $HOME/.local/bin "
-        "(and ~/.cargo/bin if you used cargo; see scripts/run_harpoon.sh)."
+        "4) Then run with PATH that includes the repo’s .venv/bin and $HOME/go/bin "
+        "(scripts/run_harpoon.sh adds .venv/bin, ~/.cargo/bin, ~/.local/bin automatically)."
     )
 
     return lines

@@ -6,7 +6,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-export PATH="${PATH}:${HOME}/go/bin:${HOME}/.local/bin:${HOME}/.cargo/bin"
+# Repo .venv first so paramspider/arjun/rich from install_harpoon_tools.sh are on PATH (PEP 668 safe).
+export PATH="${PATH}:${REPO_ROOT}/.venv/bin:${HOME}/go/bin:${HOME}/.local/bin:${HOME}/.cargo/bin"
 
 if [[ -f "$REPO_ROOT/.harpoon.env" ]]; then
   set -a
@@ -15,4 +16,7 @@ if [[ -f "$REPO_ROOT/.harpoon.env" ]]; then
   set +a
 fi
 
+if [[ -x "$REPO_ROOT/.venv/bin/python3" ]]; then
+  exec "$REPO_ROOT/.venv/bin/python3" main.py "$@"
+fi
 exec python3 main.py "$@"
