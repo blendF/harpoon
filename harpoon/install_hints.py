@@ -71,16 +71,6 @@ def format_install_hints(missing: list[str]) -> list[str]:
         return lines
 
     lines.append("── Install commands for what is missing ──")
-    if "go" in missing_set:
-        lines.append(
-            "The `go` compiler is not on your PATH but is required to build several missing tools. "
-            "Install it first (Debian/Kali: package golang-go, in the apt line below), then run the `go install` commands."
-        )
-    else:
-        lines.append(
-            "Note: names like alterx, asnmap, dnsx are Go tools — there is usually NO apt package. "
-            "Use `go install` (needs Go on PATH; Debian/Kali: sudo apt install golang-go)."
-        )
 
     apt_pkgs: set[str] = set()
     go_rows: list[tuple[str, str]] = []
@@ -94,6 +84,17 @@ def format_install_hints(missing: list[str]) -> list[str]:
             go_rows.append((name, r.go_install))
         for p in r.pip:
             pip_specs.add(p)
+
+    # Only mention installing the Go *compiler* when preflight added pseudo-dependency "go".
+    if "go" in missing_set:
+        lines.append(
+            "The `go` compiler is not on your PATH but is required to build several missing tools. "
+            "Install it first (Debian/Kali: package golang-go, in the apt line below), then run the `go install` commands."
+        )
+    elif go_rows:
+        lines.append(
+            "Note: several missing tools are Go binaries (alterx, dnsx, …) — usually no apt package; use section (2) `go install`."
+        )
 
     if apt_pkgs:
         lines.append("1) Apt packages (Debian/Kali/Ubuntu) — one line:")

@@ -1,0 +1,2 @@
+# Shell scripts must use LF so WSL/Git Bash/bash do not see stray CR (set -o pipefail errors).
+*.sh text eol=lf
