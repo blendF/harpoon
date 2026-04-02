@@ -47,7 +47,20 @@ _RECIPES: dict[str, _Recipe] = {
     "nmap": _Recipe(apt=("nmap",)),
     "zap.sh": _Recipe(apt=("zaproxy",)),
     "seclists": _Recipe(apt=("seclists",)),
+    # Pseudo-id when the Go compiler is required but not on PATH
+    "go": _Recipe(apt=("golang-go",)),
 }
+
+
+def missing_requires_go_install(missing_tool_ids: list[str]) -> bool:
+    """True if any missing Harpoon tool is normally installed via `go install`."""
+    for name in missing_tool_ids:
+        if name in ("seclists", "go"):
+            continue
+        r = _RECIPES.get(name)
+        if r and r.go_install:
+            return True
+    return False
 
 
 def format_install_hints(missing: list[str]) -> list[str]:
@@ -58,10 +71,16 @@ def format_install_hints(missing: list[str]) -> list[str]:
         return lines
 
     lines.append("── Install commands for what is missing ──")
-    lines.append(
-        "Note: names like alterx, asnmap, dnsx are Go tools — there is usually NO apt package. "
-        "Use `go install` (needs: sudo apt install golang-go)."
-    )
+    if "go" in missing_set:
+        lines.append(
+            "The `go` compiler is not on your PATH but is required to build several missing tools. "
+            "Install it first (Debian/Kali: package golang-go, in the apt line below), then run the `go install` commands."
+        )
+    else:
+        lines.append(
+            "Note: names like alterx, asnmap, dnsx are Go tools — there is usually NO apt package. "
+            "Use `go install` (needs Go on PATH; Debian/Kali: sudo apt install golang-go)."
+        )
 
     apt_pkgs: set[str] = set()
     go_rows: list[tuple[str, str]] = []

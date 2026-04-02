@@ -6,7 +6,7 @@ Harpoon is a fire-and-forget web application penetration testing tool. You provi
 
 - SQLite state engine (`harpoon/state.py`) with relational tables: `targets`, `subdomains`, `endpoints`, `technologies`, `parameters`, `vulnerabilities`
 - Fully async execution (`harpoon/runner.py`) using `asyncio.create_subprocess_exec`
-- Strict dependency gate (`harpoon/preflight.py`) that halts scans when required tools are missing, then prints **grouped install commands** (apt vs `go install` vs pip — most ProjectDiscovery tools are **not** `apt install` packages)
+- Strict dependency gate (`harpoon/preflight.py`) that halts scans when required tools are missing, then prints **grouped install commands** (apt vs `go install` vs pip — most ProjectDiscovery tools are **not** `apt install` packages). If any missing tool needs `go install` and **`go` is not on PATH**, preflight also reports **`go`** and includes **`golang-go`** in the suggested `apt` line (skipped automatically when `go` is already available)
 - Rich CLI telemetry (`harpoon/cli.py`) for phase banners, counters, estimates, and critical alerts
 - Tailwind HTML reporting (`viewreport.py`) from SQLite + deterministic PoC output
 

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from harpoon.cli import error, warn
 from harpoon.config import BASE_DIR, SECLISTS_DIR, WORDLISTS_DIR
-from harpoon.install_hints import format_install_hints
+from harpoon.install_hints import format_install_hints, missing_requires_go_install
 
 # Logical tool id -> any of these executables on PATH (or extra file checks below)
 TOOL_CANDIDATES: dict[str, list[str]] = {
@@ -110,6 +110,15 @@ def _has_curl() -> bool:
     return False
 
 
+def _has_go() -> bool:
+    """True if the Go toolchain is available (not a Harpoon scanner, but required for go install)."""
+    if shutil.which("go"):
+        return True
+    if _on_windows() and _wsl_which("go"):
+        return True
+    return False
+
+
 def _local_bin(name: str) -> bool:
     home = Path.home()
     for d in (home / ".local" / "bin", home / "go" / "bin"):
@@ -166,6 +175,10 @@ def find_missing_dependencies() -> list[str]:
     missing = [t for t in REQUIRED_TOOLS if not _has_tool(t)]
     if not _seclists_present():
         missing.append("seclists")
+    # Go compiler: only treat as missing when we need `go install` for something and `go` is not on PATH.
+    need_compiler = [m for m in missing if m != "seclists"]
+    if missing_requires_go_install(need_compiler) and not _has_go():
+        missing.append("go")
     return sorted(set(missing))
 
 
