@@ -24,3 +24,10 @@ def test_missing_requires_go_install() -> None:
     assert missing_requires_go_install(["alterx", "arjun"]) is True
     assert missing_requires_go_install(["arjun"]) is False
     assert missing_requires_go_install(["seclists"]) is False
+
+
+def test_hints_x8_is_rust_release_not_go_install() -> None:
+    text = "\n".join(format_install_hints(["x8"]))
+    assert "go install" not in text or "no longer" in text
+    assert "x86_64-linux-x8.gz" in text
+    assert "Sh1Yo/x8/releases" in text

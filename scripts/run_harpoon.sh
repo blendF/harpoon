@@ -6,7 +6,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-export PATH="${PATH}:${HOME}/go/bin:${HOME}/.local/bin"
+export PATH="${PATH}:${HOME}/go/bin:${HOME}/.local/bin:${HOME}/.cargo/bin"
 
 if [[ -f "$REPO_ROOT/.harpoon.env" ]]; then
   set -a

@@ -14,6 +14,8 @@ class _Recipe:
     apt: tuple[str, ...] = ()
     go_install: str | None = None
     pip: tuple[str, ...] = ()
+    # Extra install lines when this tool is missing (e.g. Rust release binary, no go install).
+    extra_hints: tuple[str, ...] = ()
 
 
 # Harpoon logical tool id -> how to install
@@ -32,7 +34,14 @@ _RECIPES: dict[str, _Recipe] = {
     "shuffledns": _Recipe(go_install="github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest"),
     "chaos": _Recipe(go_install="github.com/projectdiscovery/chaos-client/cmd/chaos@latest"),
     "alterx": _Recipe(go_install="github.com/projectdiscovery/alterx/cmd/alterx@latest"),
-    "x8": _Recipe(go_install="github.com/Sh1Yo/x8/cmd/x8@latest"),
+    "x8": _Recipe(
+        extra_hints=(
+            "Upstream x8 is Rust; `go install github.com/Sh1Yo/x8/cmd/x8` no longer exists.",
+            "Linux x86_64 — release binary into your Go bin dir (on PATH with run_harpoon.sh):",
+            'mkdir -p "$HOME/go/bin" && curl -fsSL "https://github.com/Sh1Yo/x8/releases/download/v4.3.0/x86_64-linux-x8.gz" | gunzip -c > "$HOME/go/bin/x8" && chmod +x "$HOME/go/bin/x8"',
+            "Other arches: `cargo install x8` (add ~/.cargo/bin to PATH) or see https://github.com/Sh1Yo/x8/releases",
+        ),
+    ),
     "interactsh-client": _Recipe(go_install="github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"),
     "notify": _Recipe(go_install="github.com/projectdiscovery/notify/cmd/notify@latest"),
     "katana": _Recipe(go_install="github.com/projectdiscovery/katana/cmd/katana@latest"),
@@ -75,6 +84,7 @@ def format_install_hints(missing: list[str]) -> list[str]:
     apt_pkgs: set[str] = set()
     go_rows: list[tuple[str, str]] = []
     pip_specs: set[str] = set()
+    extra_hint_blocks: list[tuple[str, tuple[str, ...]]] = []
     for name in sorted(missing_set):
         r = _RECIPES.get(name)
         if not r:
@@ -84,6 +94,8 @@ def format_install_hints(missing: list[str]) -> list[str]:
             go_rows.append((name, r.go_install))
         for p in r.pip:
             pip_specs.add(p)
+        if r.extra_hints:
+            extra_hint_blocks.append((name, r.extra_hints))
 
     # Only mention installing the Go *compiler* when preflight added pseudo-dependency "go".
     if "go" in missing_set:
@@ -94,6 +106,10 @@ def format_install_hints(missing: list[str]) -> list[str]:
     elif go_rows:
         lines.append(
             "Note: several missing tools are Go binaries (alterx, dnsx, …) — usually no apt package; use section (2) `go install`."
+        )
+        lines.append(
+            "If `go install` fails with pcap.h / gopacket: "
+            "`sudo apt install -y libpcap-dev pkg-config build-essential`, then retry the failed `go install` line(s)."
         )
 
     if apt_pkgs:
@@ -106,6 +122,11 @@ def format_install_hints(missing: list[str]) -> list[str]:
         for logical, mod in go_rows:
             lines.append(f"   go install -v {mod}   # missing: {logical}")
 
+    for logical, hints in extra_hint_blocks:
+        lines.append(f"Install {logical} (not via go install above):")
+        for h in hints:
+            lines.append(f"   {h}")
+
     if pip_specs:
         lines.append("3) Python CLI — user install:")
         lines.append(f"   python3 -m pip install --user {' '.join(sorted(pip_specs))}")
@@ -113,6 +134,9 @@ def format_install_hints(missing: list[str]) -> list[str]:
     if "seclists" in missing_set:
         lines.append("SecLists: bundled mode → set HARPOON_USE_BUNDLED_WORDLISTS=1 in .harpoon.env (no apt seclists needed).")
 
-    lines.append('4) Then ensure PATH includes: $HOME/go/bin and $HOME/.local/bin (see scripts/run_harpoon.sh).')
+    lines.append(
+        "4) Then ensure PATH includes: $HOME/go/bin and $HOME/.local/bin "
+        "(and ~/.cargo/bin if you used cargo; see scripts/run_harpoon.sh)."
+    )
 
     return lines

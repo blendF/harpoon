@@ -5,7 +5,10 @@ set -euo pipefail
 
 echo "==> Harpoon: installing OS packages (needs sudo)"
 sudo apt-get update
-sudo apt-get install -y seclists nmap sqlmap nikto curl golang-go python3-pip zaproxy || true
+# libpcap-dev + build-essential: required so Go tools (e.g. naabu → gopacket/pcap) compile with CGO (pcap.h).
+sudo apt-get install -y \
+  build-essential pkg-config libpcap-dev \
+  seclists nmap sqlmap nikto curl golang-go python3-pip zaproxy || true
 
 echo "==> Harpoon: Go toolchain paths (add to ~/.profile if missing)"
 export GOPATH="${GOPATH:-$HOME/go}"
@@ -26,7 +29,18 @@ go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest
 go install -v github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest
 go install -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest
 go install -v github.com/projectdiscovery/alterx/cmd/alterx@latest
-go install -v github.com/Sh1Yo/x8/cmd/x8@latest
+echo "==> Harpoon: x8 (Rust upstream — use release binary; go install path removed)"
+mkdir -p "$GOPATH/bin"
+_arch="$(uname -m)"
+if [[ "$_arch" == "x86_64" ]] || [[ "$_arch" == "amd64" ]]; then
+  curl -fsSL "https://github.com/Sh1Yo/x8/releases/download/v4.3.0/x86_64-linux-x8.gz" | gunzip -c >"$GOPATH/bin/x8"
+  chmod +x "$GOPATH/bin/x8"
+else
+  echo "    (!) No bundled x8 binary for ${_arch}; use: cargo install x8   (needs rustc/cargo), or https://github.com/Sh1Yo/x8/releases"
+  if command -v cargo >/dev/null 2>&1; then
+    cargo install x8 --locked || echo "    (!) cargo install x8 failed — try https://github.com/Sh1Yo/x8/releases"
+  fi
+fi
 go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest
 go install -v github.com/projectdiscovery/notify/cmd/notify@latest
 go install -v github.com/projectdiscovery/katana/cmd/katana@latest
@@ -38,6 +52,8 @@ echo "==> Harpoon: Python tools (user install)"
 python3 -m pip install --user --upgrade pip
 python3 -m pip install --user "git+https://github.com/devanshbatham/ParamSpider.git" arjun rich
 
-echo "==> Done. Ensure these are on your PATH:"
+echo "==> Done. From the repo root, prefer (sets PATH for Go + pip user bins):"
+echo "    bash scripts/run_harpoon.sh"
+echo "Or export PATH manually, then run main.py:"
 echo "    export PATH=\"\$PATH:\$HOME/go/bin:\$HOME/.local/bin\""
-echo "Then run: python3 main.py"
+echo "    python3 main.py"
