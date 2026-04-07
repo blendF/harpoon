@@ -173,9 +173,9 @@ def _seclists_present() -> bool:
     return False
 
 
-def install_script_path() -> Path | None:
-    """Path to optional installer script (repo root)."""
-    p = BASE_DIR / "scripts" / "install_harpoon_tools.sh"
+def setup_script_path() -> Path | None:
+    """Path to dependency setup script (Debian/Kali/WSL)."""
+    p = BASE_DIR / "scripts" / "setup.sh"
     return p if p.is_file() else None
 
 
@@ -221,7 +221,7 @@ def check_dependencies() -> None:
     if tools_missing:
         warn(f"Tools: {', '.join(tools_missing)}")
 
-    script = install_script_path()
+    script = setup_script_path()
     run_sh = BASE_DIR / "scripts" / "run_harpoon.sh"
     if script:
         warn("Install missing tools (Debian/Ubuntu/Kali/WSL):")

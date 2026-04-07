@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Harpoon dependency installer (Debian/Ubuntu/Kali/WSL).
-# Run from repo root or scripts/:  bash scripts/install_harpoon_tools.sh
+# Harpoon setup: Debian/Ubuntu/Kali/WSL — OS packages, Go/ProjectDiscovery tools, Rust x8, Python venv.
+# Run from repo root or scripts/:  bash scripts/setup.sh
+#
+# Python packages installed below must stay in sync with harpoon/install_hints.py (VENV_PIP_HINT_LINES).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,11 +11,11 @@ cd "$REPO_ROOT"
 
 echo "==> Harpoon: installing OS packages (needs sudo)"
 sudo apt-get update
-# libpcap-dev + build-essential: required so Go tools (e.g. naabu → gopacket/pcap) compile with CGO (pcap.h).
-# python3-venv: required for `python3 -m venv .venv` (Kali/Debian PEP 668 blocks system pip --user).
+# libpcap-dev + build-essential: CGO (e.g. naabu / gopacket → pcap.h).
+# python3-venv: PEP 668 safe installs. git: ParamSpider via pip from GitHub.
 sudo apt-get install -y \
   build-essential pkg-config libpcap-dev \
-  python3-venv \
+  python3-venv git \
   seclists nmap sqlmap nikto curl golang-go python3-pip zaproxy || true
 
 echo "==> Harpoon: Go toolchain paths (add to ~/.profile if missing)"
@@ -35,7 +37,7 @@ go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest
 go install -v github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest
 go install -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest
 go install -v github.com/projectdiscovery/alterx/cmd/alterx@latest
-echo "==> Harpoon: x8 (Rust upstream — use release binary; go install path removed)"
+echo "==> Harpoon: x8 (Rust release binary; upstream is not go install–able)"
 mkdir -p "$GOPATH/bin"
 _arch="$(uname -m)"
 if [[ "$_arch" == "x86_64" ]] || [[ "$_arch" == "amd64" ]]; then
@@ -54,16 +56,16 @@ go install -v github.com/tomnomnom/waybackurls@latest
 go install -v github.com/lc/gau/v2/cmd/gau@latest
 go install -v github.com/sensepost/gowitness@latest
 
-echo "==> Harpoon: Python venv in repo (avoids PEP 668 / externally-managed-environment on Kali)"
+echo "==> Harpoon: Python venv in repo (PEP 668 / externally-managed system Python)"
 if [[ ! -d .venv ]]; then
   python3 -m venv .venv
 fi
-# requirements.txt + ParamSpider from upstream git (scanner expectations)
+# --- Keep in sync with harpoon/install_hints.VENV_PIP_HINT_LINES ---
 .venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r requirements.txt
-.venv/bin/pip install "git+https://github.com/devanshbatham/ParamSpider.git"
+.venv/bin/pip install "pyinstaller>=6.10.0" rich aiosqlite arjun uro pytest pytest-asyncio
+.venv/bin/pip install "paramspider @ git+https://github.com/devanshbatham/ParamSpider.git"
 
-echo "==> Done. From the repo root, prefer (sets PATH: .venv/bin, go, optional cargo):"
+echo "==> Done. Run Harpoon from the repo root:"
 echo "    bash scripts/run_harpoon.sh"
 echo "Or activate the venv and set PATH for Go tools:"
 echo "    source .venv/bin/activate"

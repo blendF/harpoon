@@ -31,3 +31,10 @@ def test_hints_x8_is_rust_release_not_go_install() -> None:
     assert "go install" not in text or "no longer" in text
     assert "x86_64-linux-x8.gz" in text
     assert "Sh1Yo/x8/releases" in text
+
+
+def test_hints_pip_section_points_to_setup_sh() -> None:
+    text = "\n".join(format_install_hints(["paramspider"]))
+    assert "scripts/setup.sh" in text
+    assert "requirements.txt" not in text
+    assert "devanshbatham/ParamSpider" in text

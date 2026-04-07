@@ -147,7 +147,7 @@ When no WAF: full concurrency, no tool skipping.
 ```
 harpoon/
 ├── main.py                          ← Entry point: 10-phase pipeline orchestration
-├── requirements.txt                 ← Python deps (pyinstaller, paramspider, arjun, uro)
+├── scripts/setup.sh                 ← OS + Go + Rust x8 + Python venv deps (no requirements.txt)
 ├── README.md                        ← User-facing docs
 ├── CONTEXT.md                       ← This file (LLM context)
 ├── HARPOONASCIIART.txt              ← CLI banner

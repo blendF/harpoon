@@ -8,6 +8,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# Python venv install lines — keep in sync with scripts/setup.sh (pip block after `python3 -m venv .venv`).
+VENV_PIP_HINT_LINES: tuple[str, ...] = (
+    "   .venv/bin/pip install --upgrade pip",
+    '   .venv/bin/pip install "pyinstaller>=6.10.0" rich aiosqlite arjun uro pytest pytest-asyncio',
+    '   .venv/bin/pip install "paramspider @ git+https://github.com/devanshbatham/ParamSpider.git"',
+)
+
 
 @dataclass(frozen=True)
 class _Recipe:
@@ -129,12 +136,12 @@ def format_install_hints(missing: list[str]) -> list[str]:
 
     if pip_specs:
         lines.append(
-            "3) Python packages — use a venv in the Harpoon repo (Kali/Debian PEP 668 blocks `pip install --user` on system Python):"
+            "3) Python venv (Kali/Debian PEP 668 blocks `pip install --user` on system Python). "
+            "Easiest: `bash scripts/setup.sh` from the repo root. Manual equivalent:"
         )
-        lines.append("   sudo apt install -y python3-venv   # if `python3 -m venv` fails")
-        lines.append("   python3 -m venv .venv && .venv/bin/pip install --upgrade pip")
-        lines.append("   .venv/bin/pip install -r requirements.txt")
-        lines.append(f"   .venv/bin/pip install {' '.join(sorted(pip_specs))}")
+        lines.append("   sudo apt install -y python3-venv git   # if needed")
+        lines.append("   python3 -m venv .venv")
+        lines.extend(VENV_PIP_HINT_LINES)
 
     if "seclists" in missing_set:
         lines.append("SecLists: bundled mode → set HARPOON_USE_BUNDLED_WORDLISTS=1 in .harpoon.env (no apt seclists needed).")
