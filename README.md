@@ -2,7 +2,9 @@
   <img src="assets/readme-banner.png" alt="Harpoon — autonomous black-box pentesting for web applications" width="100%" />
 </p>
 
-<p align="center"><strong>Autonomous Black-Box Pentesting for Web Applications.</strong></p>
+<h1 align="center"><strong>Harpoon. - Fire and Forget.</strong></h1>
+
+<hr>
 
 Harpoon is a tool for **autonomous black-box penetration testing of web applications**. It is **optimized for Kali Linux**: it orchestrates scanners that are already part of a typical Kali image, adds **ProjectDiscovery** and related tools that are not (see **`scripts/setup.sh`** for the exact `go install`, Rust **x8** binary, and Python venv steps), and layers Harpoon’s own pipeline logic, SQLite state, and reporting on top. **Few extra moving parts** are required beyond what that script installs. You can also run Harpoon on **other Debian-based distributions** or **WSL on Windows** after installing the same class of dependencies (use `setup.sh` on apt-based systems, or map its steps to your package manager).
 
