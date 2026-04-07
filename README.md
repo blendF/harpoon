@@ -1,4 +1,10 @@
-# Harpoon
+<p align="center">
+  <img src="assets/readme-banner.png" alt="Harpoon — autonomous black-box pentesting for web applications" width="100%" />
+</p>
+
+<h1 align="center">Harpoon</h1>
+
+<p align="center"><strong>Autonomous Black-Box Pentesting for Web Applications.</strong></p>
 
 ## Executive summary
 
